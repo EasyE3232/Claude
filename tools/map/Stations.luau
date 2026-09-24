@@ -5,14 +5,13 @@
 	  Base      invisible part at the station origin (defines station space)
 	  Rider     invisible part where the athlete's HumanoidRootPart is anchored
 	  Approach  invisible floor point the athlete walks to before hopping on
-	  Pad       floor plate (lit when the slot is unlocked)
-	  Outline   floor outline strips (lit when the slot is unlocked)
 	  Moving    Models the client animates (bar, stack, pedals...)
 	  Cables    thin parts the client stretches between pulleys and handles
 ]]
 
 local Geo = require("tools/map/Geo")
 local Specs = require("src/ReplicatedStorage/Modules/Gym/StationSpecs")
+local Raw = Specs.RAW -- authored at scale 1; each finished station is scaled by Specs.SCALE
 
 local Stations = {}
 local Pal = Geo.Palette
@@ -31,9 +30,18 @@ local function setPrimary(model, part)
 	return model
 end
 
+local PLATE_COLORS = {
+	Color3.fromRGB(200, 38, 42), -- 25
+	Color3.fromRGB(34, 86, 196), -- 20
+	Color3.fromRGB(232, 186, 36), -- 15
+	Color3.fromRGB(38, 148, 72), -- 10
+	Color3.fromRGB(212, 214, 220), -- 5 (change plate)
+}
+local PLATE_DIAMETER = { 1, 1, 1, 1, 0.68 }
+
 -- Olympic barbell centered at `cf` (axis = cf.X). Returns model.
 local function barbell(parent, name, cf, plateColor)
-	local b = Specs.BARBELL
+	local b = Raw.BARBELL
 	local m = Geo.model(parent, name)
 	local shaftLen = b.SleeveStart * 2
 	local shaft = Geo.cyl(m, "Shaft", shaftLen, b.ShaftDiameter, cf, Pal.Chrome, M.Metal, { Reflectance = 0.12, CanCollide = false })
@@ -44,10 +52,14 @@ local function barbell(parent, name, cf, plateColor)
 		Geo.cyl(m, "Sleeve", sleeveLen, b.SleeveDiameter, cf * CFrame.new(s * (b.SleeveStart + sleeveLen / 2), 0, 0), Pal.Chrome, M.Metal, { Reflectance = 0.15, CanCollide = false })
 		local x = b.SleeveStart + 0.08
 		for k = 1, b.Plates do
-			local dia = k == 1 and b.PlateDiameter or b.PlateDiameter * 0.9
+			-- competition bumper colors, heaviest inside. Tier k = shown when the
+			-- athlete's rarity index >= k (Common 1 plate ... Legendary 5)
+			local dia = PLATE_DIAMETER[k] * b.PlateDiameter
 			x += b.PlateThickness / 2
-			Geo.cyl(m, "Plate", b.PlateThickness, dia, cf * CFrame.new(s * x, 0, 0), plateColor or Pal.Plate, M.Rubber, { CanCollide = false })
-			Geo.cyl(m, "PlateHub", b.PlateThickness + 0.02, 0.42, cf * CFrame.new(s * x, 0, 0), Pal.Chrome, M.Metal, { CanCollide = false })
+			local attrs = { Tier = k }
+			local hidden = k > 2 and 1 or 0 -- idle bars show 2 plates; the client loads more per athlete
+			Geo.cyl(m, "Plate", b.PlateThickness, dia, cf * CFrame.new(s * x, 0, 0), plateColor or PLATE_COLORS[k], M.Rubber, { CanCollide = false, Attrs = attrs, Transparency = hidden })
+			Geo.cyl(m, "PlateHub", b.PlateThickness + 0.02, 0.42, cf * CFrame.new(s * x, 0, 0), Pal.Chrome, M.Metal, { CanCollide = false, Attrs = attrs, Transparency = hidden })
 			x += b.PlateThickness / 2 + 0.01
 		end
 		Geo.cyl(m, "Clip", 0.1, 0.3, cf * CFrame.new(s * (x + 0.06), 0, 0), Pal.Accent, M.Rubber, { CanCollide = false, Role = "Accent" })
@@ -56,7 +68,7 @@ local function barbell(parent, name, cf, plateColor)
 end
 
 local function dumbbell(parent, name, cf)
-	local d = Specs.DumbbellCurl
+	local d = Raw.DumbbellCurl
 	local m = Geo.model(parent, name)
 	local handle = Geo.cyl(m, "Handle", d.HandleLength, 0.17, cf, Pal.Steel, M.Metal, { CanCollide = false })
 	setPrimary(m, handle)
@@ -64,6 +76,11 @@ local function dumbbell(parent, name, cf)
 		local x = s * (d.HandleLength / 2 + d.HeadLength / 2)
 		Geo.cyl(m, "Head", d.HeadLength, d.HeadDiameter, cf * CFrame.new(x, 0, 0), Pal.Plate, M.Rubber, { CanCollide = false })
 		Geo.cyl(m, "Cap", 0.03, d.HeadDiameter * 0.55, cf * CFrame.new(x + s * (d.HeadLength / 2 + 0.01), 0, 0), Pal.Chrome, M.Metal, { CanCollide = false })
+		-- extra plates for heavier (rarer) athletes
+		for k = 2, 5 do
+			local px = s * (d.HandleLength / 2 + d.HeadLength + 0.04 + (k - 2) * 0.09)
+			Geo.cyl(m, "HeadPlate", 0.08, d.HeadDiameter * (1.02 + k * 0.03), cf * CFrame.new(px, 0, 0), PLATE_COLORS[6 - k] or Pal.Plate, M.Rubber, { CanCollide = false, Attrs = { Tier = k }, Transparency = k > 2 and 1 or 0 })
+		end
 	end
 	return m
 end
@@ -83,19 +100,18 @@ local function weightStack(station, L, stackPos, plates, plateH, movingCount, he
 	local shroud = Geo.part(static, "StackShroud", Vector3.new(2.3, height - 0.8, 0.08), base * CFrame.new(0, height / 2 - 0.2, -0.62), Pal.FrameDark, M.Metal)
 	Geo.decorate(Geo.part(static, "ShroudStripe", Vector3.new(0.18, height - 1.4, 0.02), shroud.CFrame * CFrame.new(0.7, 0, 0.05), Pal.Accent, M.Neon, { Role = "Accent" }))
 
+	-- every plate but the bottom two can be lifted; StackOrder 1 = top plate.
+	-- The client lifts more of them for rarer (stronger) athletes.
+	movingCount = plates - 2
 	local moving = movingModel(station, "Stack")
-	local first
 	for i = 1, plates do
 		local cf = base * CFrame.new(0, (i - 0.5) * plateH, 0)
 		local isMoving = i > plates - movingCount
-		local p = Geo.part(isMoving and moving or static, "StackPlate", Vector3.new(1.3, plateH - 0.025, 0.75), cf, Pal.Stack, M.Metal, { CanCollide = false })
-		if isMoving and not first then
-			first = p
-		end
+		Geo.part(isMoving and moving or static, "StackPlate", Vector3.new(1.3, plateH - 0.025, 0.75), cf, Pal.Stack, M.Metal, { CanCollide = false, Attrs = isMoving and { StackOrder = plates - i + 1 } or nil })
 	end
 	local topY = plates * plateH
 	local cap = Geo.part(moving, "StackCap", Vector3.new(1.34, 0.12, 0.8), base * CFrame.new(0, topY + 0.06, 0), Pal.Chrome, M.Metal, { CanCollide = false })
-	Geo.decorate(Geo.ball(moving, "Pin", 0.16, base * CFrame.new(0.1, (plates - movingCount + 0.5) * plateH, 0.42), Pal.Accent, M.Rubber, { Role = "Accent" }))
+	Geo.decorate(Geo.ball(moving, "Pin", 0.16, base * CFrame.new(0.1, (plates - 0.5) * plateH, 0.42), Pal.Accent, M.Rubber, { Role = "Accent" }))
 	setPrimary(moving, cap)
 	return moving
 end
@@ -221,7 +237,7 @@ function B.BenchPress(st, L, sp)
 	for _, s in ipairs({ -1, 1 }) do
 		Geo.part(st, "Upright", Vector3.new(0.32, 4.3, 0.32), L(CFrame.new(s * sp.UprightX, 2.15, uz)), Pal.Frame, M.Metal)
 		Geo.decorate(Geo.part(st, "UprightStripe", Vector3.new(0.06, 3.6, 0.02), L(CFrame.new(s * sp.UprightX, 2.3, uz - 0.17)), Pal.Accent, M.Rubber, { Role = "Accent" }))
-		local hookY = sp.HookY - Specs.BARBELL.ShaftDiameter / 2 - 0.06
+		local hookY = sp.HookY - Raw.BARBELL.ShaftDiameter / 2 - 0.06
 		Geo.part(st, "JHook", Vector3.new(0.3, 0.12, 0.5), L(CFrame.new(s * sp.UprightX, hookY, sp.HookZ + 0.03)), Pal.Accent, M.Rubber, { Role = "Accent" })
 		Geo.part(st, "JHookLip", Vector3.new(0.3, 0.3, 0.08), L(CFrame.new(s * sp.UprightX, hookY + 0.1, sp.HookZ - 0.2)), Pal.Accent, M.Rubber, { Role = "Accent" })
 		-- plate storage peg with spare plates
@@ -296,7 +312,7 @@ function B.Squat(st, L, sp)
 	for _, s in ipairs({ -1, 1 }) do
 		Geo.part(st, "TopSide", Vector3.new(0.3, 0.3, sp.BackPostZ - sp.FrontPostZ), L(CFrame.new(s * sp.PostX, H - 0.15, (sp.FrontPostZ + sp.BackPostZ) / 2)), Pal.Frame, M.Metal)
 		Geo.part(st, "FloorSide", Vector3.new(0.3, 0.2, sp.BackPostZ - sp.FrontPostZ + 0.4), L(CFrame.new(s * sp.PostX, 0.1, (sp.FrontPostZ + sp.BackPostZ) / 2)), Pal.FrameDark, M.Metal)
-		local hookY = sp.HookY - Specs.BARBELL.ShaftDiameter / 2 - 0.06
+		local hookY = sp.HookY - Raw.BARBELL.ShaftDiameter / 2 - 0.06
 		Geo.part(st, "JHook", Vector3.new(0.32, 0.12, sp.FrontPostZ - sp.HookZ + 0.2), L(CFrame.new(s * sp.PostX, hookY, (sp.FrontPostZ + sp.HookZ) / 2 - 0.05)), Pal.Accent, M.Rubber, { Role = "Accent" })
 		Geo.part(st, "JHookLip", Vector3.new(0.32, 0.3, 0.08), L(CFrame.new(s * sp.PostX, hookY + 0.1, sp.HookZ - 0.2)), Pal.Accent, M.Rubber, { Role = "Accent" })
 		Geo.part(st, "Safety", Vector3.new(0.3, 0.3, 2.3), L(CFrame.new(s * sp.PostX, sp.SafetyY, sp.FrontPostZ - 1.1)), Pal.Steel, M.Metal)
@@ -382,7 +398,7 @@ function B.Deadlift(st, L, sp)
 	Geo.part(st, "ChalkPost", Vector3.new(0.2, 3.2, 0.2), stand, Pal.Frame, M.Metal)
 	Geo.decorate(Geo.cyl(st, "ChalkBowl", 0.35, 1.0, stand * CFrame.new(0, 1.7, 0) * CFrame.Angles(0, 0, rad(90)), Pal.Frame, M.Metal))
 	Geo.decorate(Geo.cyl(st, "Chalk", 0.05, 0.85, stand * CFrame.new(0, 1.88, 0) * CFrame.Angles(0, 0, rad(90)), Pal.White, M.Sand))
-	barbell(st:FindFirstChild("Moving"), "Bar", L(CFrame.new(0, ps.Y + Specs.BARBELL.PlateDiameter / 2, sp.BarZ)))
+	barbell(st:FindFirstChild("Moving"), "Bar", L(CFrame.new(0, ps.Y + Raw.BARBELL.PlateDiameter / 2, sp.BarZ)))
 	return CFrame.new(0, ps.Y + 3, 0.55), Vector3.new(0, 0, 4.4)
 end
 
@@ -435,7 +451,7 @@ end
 -- ----------------------------------------------------------------------
 -- decor = true builds a non-interactive copy (set dressing, no slot)
 function Stations.Build(kind, slot, parent, baseCF, decor)
-	local sp = Specs[kind]
+	local sp = Raw[kind]
 	assert(sp and B[kind], "Unknown station kind " .. tostring(kind))
 	local st = Instance.new("Model")
 	st.Name = decor and ("Decor" .. kind) or ("Station" .. slot)
@@ -456,31 +472,23 @@ function Stations.Build(kind, slot, parent, baseCF, decor)
 	st.PrimaryPart = base
 
 	local riderLocal, approachLocal = B[kind](st, L, sp)
-	if decor then
-		return st
+	if not decor then
+		local rider = Geo.decorate(Geo.part(st, "Rider", Vector3.new(2, 2, 1), baseCF * riderLocal, Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
+		rider.CastShadow = false
+		local approach = Geo.decorate(Geo.part(st, "Approach", Vector3.new(1, 0.2, 1), baseCF * CFrame.new(approachLocal), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
+		approach.CastShadow = false
 	end
 
-	local rider = Geo.decorate(Geo.part(st, "Rider", Vector3.new(2, 2, 1), baseCF * riderLocal, Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
-	rider.CastShadow = false
-	local approach = Geo.decorate(Geo.part(st, "Approach", Vector3.new(1, 0.2, 1), baseCF * CFrame.new(approachLocal), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
-	approach.CastShadow = false
-
-	-- floor pad (slot indicator) at the approach point + outline around the footprint
-	local pad = Geo.decorate(Geo.part(st, "Pad", Vector3.new(2.4, 0.06, 2.4), baseCF * CFrame.new(approachLocal + Vector3.new(0, 0.04, 0)), Color3.fromRGB(28, 30, 38), M.SmoothPlastic, { Transparency = 0.2 }))
-	pad.CastShadow = false
-	Geo.surfaceText(pad, Enum.NormalId.Top, tostring(slot), { Name = "SlotNumber", Color = Color3.fromRGB(230, 235, 245), PPS = 60 })
-
-	local fp = sp.Footprint
-	local outline = Geo.model(st, "Outline")
-	local w, d = fp.X / 2 + 0.3, fp.Z / 2 + 0.3
-	for _, e in ipairs({
-		{ Vector3.new(fp.X + 0.6, 0.04, 0.14), Vector3.new(0, 0.02, -d) },
-		{ Vector3.new(fp.X + 0.6, 0.04, 0.14), Vector3.new(0, 0.02, d) },
-		{ Vector3.new(0.14, 0.04, fp.Z + 0.6), Vector3.new(-w, 0.02, 0) },
-		{ Vector3.new(0.14, 0.04, fp.Z + 0.6), Vector3.new(w, 0.02, 0) },
-	}) do
-		local p = Geo.decorate(Geo.part(outline, "Edge", e[1], baseCF * CFrame.new(e[2]), Color3.fromRGB(28, 30, 38), M.SmoothPlastic))
-		p.CastShadow = false
+	-- scale the finished machine about its base (bigger, chunkier equipment)
+	local k = Specs.SCALE
+	if k ~= 1 then
+		for _, p in ipairs(st:GetDescendants()) do
+			if p:IsA("BasePart") and p ~= base then
+				local rel = baseCF:ToObjectSpace(p.CFrame)
+				p.Size = p.Size * k
+				p.CFrame = baseCF * (CFrame.new(rel.Position * k) * (rel - rel.Position))
+			end
+		end
 	end
 	return st
 end

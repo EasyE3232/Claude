@@ -131,6 +131,7 @@ function RigSolver:_measure()
 	d.PelvisDepth = self.Parts.LowerTorso.Size.Z
 	d.ChestDepth = self.Parts.UpperTorso.Size.Z
 	d.ShoulderHalfWidth = math.abs(J.LeftShoulder.C0.Position.X)
+	d.Scale = d.LegLength / 2.4 -- 1 for a standard-size R15 body
 	self.Dims = d
 end
 

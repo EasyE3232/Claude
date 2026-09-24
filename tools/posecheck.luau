@@ -29,7 +29,7 @@ local folder = R.Instance.new("Folder")
 local baseCF = CFrame.new(0, 0, 0)
 local st = Stations.Build(kind, 1, folder, baseCF)
 
-local rig = BlockRig.Build({ Shirt = R.Color3.fromRGB(220, 60, 60), Pants = R.Color3.fromRGB(60, 90, 220), Skin = R.Color3.fromRGB(250, 205, 160) })
+local rig = BlockRig.Build({ Shirt = R.Color3.fromRGB(220, 60, 60), Pants = R.Color3.fromRGB(60, 90, 220), Skin = R.Color3.fromRGB(250, 205, 160), Scale = Specs.SCALE })
 rig.Parent = folder
 local hrp = rig.HumanoidRootPart
 local riderCF = st.Rider.CFrame
@@ -40,7 +40,7 @@ local S = { Base = st.Base.CFrame, Spec = Specs[kind], RestLocal = {} }
 for _, m in ipairs(st.Moving:GetChildren()) do
 	S.RestLocal[m.Name] = S.Base:ToObjectSpace(m.PrimaryPart.CFrame)
 end
-local P = Exercises.Params(tonumber(process.env.SEED or "7"))
+local P = Exercises.Params(tonumber(process.env.SEED or "7"), tonumber(process.env.RARITY or "5"))
 P.Offset = 0
 
 local function dumpPart(p, cf, list, tag)
@@ -71,10 +71,12 @@ for _, t in ipairs(times) do
 		movedGroups[name] = cf
 	end
 	for _, d in ipairs(st:GetDescendants()) do
-		if d:IsA("BasePart") and d.Transparency < 1 then
+		local tier = d:GetAttribute("Tier")
+		local order = d:GetAttribute("StackOrder")
+		if d:IsA("BasePart") and (d.Transparency < 1 or tier) and not (tier and tier > P.Rarity) then
 			local group = d.Parent and d.Parent.Parent == st.Moving and d.Parent or nil
 			local cf = nil
-			if group and movedGroups[group.Name] then
+			if group and movedGroups[group.Name] and not (order and order > 2 + 2 * P.Rarity) then
 				local rel = group.PrimaryPart.CFrame:ToObjectSpace(d.CFrame)
 				cf = movedGroups[group.Name] * rel
 			end

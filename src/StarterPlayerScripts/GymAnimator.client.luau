@@ -81,12 +81,14 @@ local function buildCtx(station)
 			if prim then
 				local primRest = prim.CFrame
 				ctx.RestLocal[m.Name] = ctx.Base:ToObjectSpace(primRest)
-				local g = { Parts = {}, Rel = {}, Rest = {} }
+				local g = { Parts = {}, Rel = {}, Rest = {}, Tier = {}, Order = {} }
 				for _, p in ipairs(m:GetDescendants()) do
 					if p:IsA("BasePart") then
 						table.insert(g.Parts, p)
 						table.insert(g.Rel, primRest:ToObjectSpace(p.CFrame))
 						table.insert(g.Rest, p.CFrame)
+						g.Tier[#g.Parts] = p:GetAttribute("Tier")
+						g.Order[#g.Parts] = p:GetAttribute("StackOrder")
 					end
 				end
 				ctx.Groups[m.Name] = g
@@ -109,12 +111,44 @@ local function getCtx(station)
 	return stationCtx[station] or buildCtx(station)
 end
 
-local function applyEquipment(ctx, e)
+-- Heavier weight for rarer athletes: rarity index = plates per side on bars and
+-- dumbbells (Common 1 ... Legendary 5), and more of the weight stack gets lifted.
+local IDLE_PLATES = 2
+local function plateCount(rarity)
+	return math.clamp(rarity or 1, 1, 5)
+end
+local function stackCount(rarity)
+	return 2 + 2 * math.clamp(rarity or 1, 1, 5)
+end
+
+local function setPlates(ctx, count)
+	if ctx.PlatesShown == count then
+		return
+	end
+	ctx.PlatesShown = count
+	for _, g in pairs(ctx.Groups) do
+		for i, p in ipairs(g.Parts) do
+			local tier = g.Tier[i]
+			if tier then
+				p.Transparency = tier <= count and 0 or 1
+			end
+		end
+	end
+end
+
+local function applyEquipment(ctx, e, rarity)
+	setPlates(ctx, plateCount(rarity))
+	local lift = stackCount(rarity)
 	for name, cf in pairs(e.Moves) do
 		local g = ctx.Groups[name]
 		if g then
 			for i, p in ipairs(g.Parts) do
-				queue(p, cf * g.Rel[i])
+				local order = g.Order[i]
+				if order and order > lift then
+					queue(p, g.Rest[i]) -- below the pin: stays down
+				else
+					queue(p, cf * g.Rel[i])
+				end
 			end
 		end
 	end
@@ -131,6 +165,7 @@ local function applyEquipment(ctx, e)
 end
 
 local function restoreEquipment(ctx)
+	setPlates(ctx, IDLE_PLATES)
 	for _, g in pairs(ctx.Groups) do
 		for i, p in ipairs(g.Parts) do
 			queue(p, g.Rest[i])
@@ -164,7 +199,8 @@ local function activate(model, station)
 		Ctx = ctx,
 		Station = station,
 		SeatedAt = model:GetAttribute("SeatedAt"),
-		P = Exercises.Params(model:GetAttribute("Seed") or 1),
+		Rarity = model:GetAttribute("Rarity") or 1,
+		P = Exercises.Params(model:GetAttribute("Seed") or 1, model:GetAttribute("Rarity") or 1),
 		StartClock = os.clock(),
 		StartPelvis = lastPelvis[model],
 	}
@@ -211,7 +247,7 @@ local function animate(a, now)
 		rig:blendFrom(a.Snap, smooth(k))
 	end
 	rig:apply()
-	applyEquipment(a.Ctx, e)
+	applyEquipment(a.Ctx, e, a.Rarity)
 end
 
 -- ----------------------------------------------------------------------

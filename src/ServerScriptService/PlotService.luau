@@ -6,14 +6,17 @@
 	Each plot model (GymWarsMap.Plots.PlotN) contains:
 	  Floor, WallBack/WallLeft/WallRight, Sign, FrontDesk, DeskSpawn, PlotSpawn,
 	  WorkoutStation (owner's heavy bag), GymZone (interior volume),
-	  Stations/Station1..Station18 (6 per floor, see tools/map/Stations.luau),
-	  FloorGates/GateN (blocks the stairs to floor N until it's bought)
+	  Floor1..Floor3 folders (each with Stations/StationN, see tools/map/Gym.luau),
+	  Roof1..Roof3 folders (the roof on top of each possible height)
+	Floors that aren't bought are kept in ServerStorage, so the building grows
+	a story each time the owner buys a Gym Floor.
 	Parts tagged with the "ColorRole" attribute ("Wall" / "Accent" / "AccentDim")
 	are recolored by the owner's gym color preset.
 ]]
 
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
 local Constants = require(RS.Modules.Constants)
 local StationSpecs = require(RS.Modules.Gym.StationSpecs)
@@ -23,9 +26,14 @@ local PlotService = {}
 local plots = {} -- [plotId] = plot record
 local ownerToPlot = {} -- [userId] = plotId
 
+local hiddenRoot = ServerStorage:FindFirstChild("HiddenGymFloors")
+if not hiddenRoot then
+	hiddenRoot = Instance.new("Folder")
+	hiddenRoot.Name = "HiddenGymFloors"
+	hiddenRoot.Parent = ServerStorage
+end
+
 local DEFAULT_COLOR = 3 -- "Ice" (blue accents, like the reference gym)
-local LOCKED_COLOR = Color3.fromRGB(28, 30, 38)
-local OPEN_COLOR = Color3.fromRGB(90, 220, 150)
 
 -- ----------------------------------------------------------------------
 local function makeSignGui(signPart)
@@ -54,30 +62,6 @@ local function makeSignGui(signPart)
 	return gui
 end
 
-local function lockTag(pad)
-	local tag = pad:FindFirstChild("LockTag")
-	if tag then
-		return tag
-	end
-	tag = Instance.new("BillboardGui")
-	tag.Name = "LockTag"
-	tag.Size = UDim2.new(0, 150, 0, 40)
-	tag.StudsOffsetWorldSpace = Vector3.new(0, 4.5, 0)
-	tag.MaxDistance = 45
-	tag.LightInfluence = 0
-	tag.Parent = pad
-	local label = Instance.new("TextLabel")
-	label.Name = "Label"
-	label.Size = UDim2.new(1, 0, 1, 0)
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBlack
-	label.TextScaled = true
-	label.TextColor3 = Color3.fromRGB(255, 255, 255)
-	label.TextStrokeTransparency = 0.3
-	label.Parent = tag
-	return tag
-end
-
 -- ----------------------------------------------------------------------
 function PlotService.Init()
 	local folder = workspace:WaitForChild("GymWarsMap"):WaitForChild("Plots")
@@ -95,16 +79,40 @@ function PlotService.Init()
 				Stations = {},
 				Roles = { Wall = {}, Accent = {}, AccentDim = {} },
 			}
-			local stations = model:FindFirstChild("Stations")
-			for k = 1, Constants.RACK_SLOT_MAX do
-				plot.Stations[k] = stations and stations:FindFirstChild("Station" .. k)
+			-- upper floors and roofs are parked in ServerStorage while not shown
+			plot.Hidden = hiddenRoot:FindFirstChild("Plot" .. i)
+			if not plot.Hidden then
+				plot.Hidden = Instance.new("Folder")
+				plot.Hidden.Name = "Plot" .. i
+				plot.Hidden.Parent = hiddenRoot
 			end
-			for _, d in ipairs(model:GetDescendants()) do
-				local role = d:IsA("BasePart") and d:GetAttribute("ColorRole")
-				if role and plot.Roles[role] then
-					table.insert(plot.Roles[role], d)
+			plot.Floors, plot.RoofLevels = {}, {}
+			for _, container in ipairs({ model, plot.Hidden }) do
+				for _, child in ipairs(container:GetChildren()) do
+					local f = child:GetAttribute("Floor")
+					local level = child:GetAttribute("Level")
+					if child:IsA("Folder") and f then
+						plot.Floors[f] = child
+					elseif child:IsA("Folder") and level then
+						plot.RoofLevels[level] = child
+					end
+				end
+				for _, d in ipairs(container:GetDescendants()) do
+					local role = d:IsA("BasePart") and d:GetAttribute("ColorRole")
+					if role and plot.Roles[role] then
+						table.insert(plot.Roles[role], d)
+					end
+					local slot = d:IsA("Model") and d:GetAttribute("Slot")
+					if slot then
+						plot.Stations[slot] = d
+					end
 				end
 			end
+			local sign = model:FindFirstChild("Sign")
+			if sign then
+				plot.SignBase = sign.CFrame
+			end
+			plot.Level = 0
 			plots[i] = plot
 			makeSignGui(model:WaitForChild("Sign"))
 			PlotService.SetSignText(i, "OPEN GYM")
@@ -228,61 +236,51 @@ function PlotService.ApplyColor(plotId, presetIndex)
 	plot.Model:SetAttribute("AccentColor", preset.Accent)
 end
 
--- Lights up the first `unlockedCount` stations' floor pads, dims the rest.
+-- `unlockedCount` machines are usable; shows the floors that contain them.
 function PlotService.RefreshSlots(plotId, unlockedCount)
 	local plot = plots[plotId]
 	if not plot then
 		return
 	end
 	plot.Unlocked = unlockedCount
-	-- stair gates: floor N opens once its first machine is unlocked
-	local gates = plot.Model:FindFirstChild("FloorGates")
-	if gates then
-		for _, gate in ipairs(gates:GetChildren()) do
-			local floor = gate:GetAttribute("Floor")
-			if floor and gate:IsA("BasePart") then
-				local open = unlockedCount >= (floor - 1) * Constants.MACHINES_PER_FLOOR + 1
-				gate.CanCollide = not open
-				gate.Transparency = open and 1 or 0.35
-				for _, gui in ipairs(gate:GetChildren()) do
-					if gui:IsA("SurfaceGui") then
-						gui.Enabled = not open
-					end
-				end
-			end
+	PlotService.SetFloorLevel(plotId, PlotService.FloorsForSlots(unlockedCount))
+end
+
+-- How many floors are open for a given machine count.
+function PlotService.FloorsForSlots(unlockedCount)
+	local floors = 1
+	for f, first in ipairs(StationSpecs.FLOOR_FIRST_SLOT) do
+		if unlockedCount >= first then
+			floors = f
 		end
 	end
-	for k = 1, Constants.RACK_SLOT_MAX do
-		local station = plot.Stations[k]
-		if station then
-			local open = k <= unlockedCount
-			local color = open and OPEN_COLOR or LOCKED_COLOR
-			local pad = station:FindFirstChild("Pad")
-			if pad then
-				pad.Color = color
-				pad.Material = open and Enum.Material.Neon or Enum.Material.SmoothPlastic
-				pad.Transparency = open and 0.35 or 0.2
-				local tag = lockTag(pad)
-				tag.Enabled = plot.OwnerUserId ~= 0
-				tag.Label.Text = open and PlotService.StationName(station) or "LOCKED — buy this floor"
-				tag.Label.TextColor3 = open and Color3.fromRGB(190, 255, 215) or Color3.fromRGB(255, 150, 150)
-			end
-			local outline = station:FindFirstChild("Outline")
-			if outline then
-				for _, e in ipairs(outline:GetChildren()) do
-					if e:IsA("BasePart") then
-						e.Color = color
-						e.Material = open and Enum.Material.Neon or Enum.Material.SmoothPlastic
-					end
-				end
-			end
-		end
+	return floors
+end
+
+-- Show floors 1..level (+ the roof on top of `level`); park the rest in
+-- ServerStorage so nobody can see or enter floors that aren't bought.
+function PlotService.SetFloorLevel(plotId, level)
+	local plot = plots[plotId]
+	if not plot or plot.Level == level then
+		return
+	end
+	plot.Level = level
+	for f, folder in pairs(plot.Floors) do
+		folder.Parent = (f <= level) and plot.Model or plot.Hidden
+	end
+	for l, folder in pairs(plot.RoofLevels) do
+		folder.Parent = (l == level) and plot.Model or plot.Hidden
+	end
+	local sign = plot.Model:FindFirstChild("Sign")
+	if sign and plot.SignBase then
+		local up = (sign:GetAttribute("FloorHeight") or 16) * (level - 1)
+		sign.CFrame = plot.SignBase + Vector3.new(0, up, 0)
 	end
 end
 
 function PlotService.GetSlotPart(plotId, k)
 	local station = PlotService.GetStation(plotId, k)
-	return station and station:FindFirstChild("Pad") or nil
+	return station and station:FindFirstChild("Approach") or nil
 end
 
 function PlotService.FindOpenSlot(plotId)

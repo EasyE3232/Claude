@@ -16,9 +16,8 @@ Constants.AUTOSAVE_INTERVAL = 60 -- seconds
 -- MAP  (linear map: 5 gyms on each side of a long red-carpet conveyor)
 -- ======================================================================
 Constants.PLOT_COUNT = 8
-Constants.FLOOR_COUNT = 3 -- every gym is a 3-story building
-Constants.MACHINES_PER_FLOOR = 6
-Constants.RACK_SLOT_MAX = 18 -- equipment stations per gym (Station1..Station18, 6 per floor)
+Constants.FLOOR_COUNT = 3 -- every gym grows up to 3 stories
+Constants.RACK_SLOT_MAX = 33 -- machines per gym (3 of each): 12 + 12 + 9 across the 3 floors
 
 -- ======================================================================
 -- SHARED CONVEYOR (runs down the middle of the map along +Z)
@@ -143,8 +142,8 @@ Constants.EQUIPMENT_ORDER = { "Floors", "WorkoutGain", "DeskSpeed" }
 Constants.EQUIPMENT = {
 	Floors = {
 		Name = "Gym Floors",
-		Desc = "Open another floor of your gym (+6 machines)",
-		Values = { 6, 12, 18 }, -- machines available (floor 1, floors 1-2, floors 1-3)
+		Desc = "Build another story on your gym (more machines)",
+		Values = { 12, 24, 33 }, -- machines available (floor 1, floors 1-2, floors 1-3)
 		Costs = { 0, 7500, 45000 },
 		Unit = " machines",
 	},

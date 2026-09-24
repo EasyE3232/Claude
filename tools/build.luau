@@ -32,6 +32,28 @@ end
 Map.Build(workspace)
 workspace.StreamingEnabled = false
 
+-- New gyms start as one story: floors 2-3 (and their roofs) wait in
+-- ServerStorage until the owner buys them (PlotService moves them in).
+local ServerStorage = game:GetService("ServerStorage")
+local oldHidden = ServerStorage:FindFirstChild("HiddenGymFloors")
+if oldHidden then
+	oldHidden:Destroy()
+end
+local hidden = Instance.new("Folder")
+hidden.Name = "HiddenGymFloors"
+hidden.Parent = ServerStorage
+for _, plot in ipairs(workspace.GymWarsMap.Plots:GetChildren()) do
+	local holder = Instance.new("Folder")
+	holder.Name = plot.Name
+	holder.Parent = hidden
+	for _, name in ipairs({ "Floor2", "Floor3", "Roof2", "Roof3" }) do
+		local f = plot:FindFirstChild(name)
+		if f then
+			f.Parent = holder
+		end
+	end
+end
+
 -- ----------------------------------------------------------------------
 -- Lighting (Future = real-time lights + shadows, needed for a realistic gym)
 -- ----------------------------------------------------------------------

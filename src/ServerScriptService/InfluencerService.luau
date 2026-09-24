@@ -25,6 +25,7 @@ local Constants = require(RS.Modules.Constants)
 local PlayerDataService = require(SSS.PlayerDataService)
 local PlotService = require(SSS.PlotService)
 local NpcService = require(SSS.NpcService)
+local StationSpecs = require(RS.Modules.Gym.StationSpecs)
 local Notify = require(SSS.Notify)
 
 local InfluencerService = {}
@@ -55,6 +56,7 @@ local function looksFor(rec)
 		Width = 1 + r:NextNumber(0, 0.06) + tier * 0.05,
 		Depth = 1 + r:NextNumber(0, 0.05) + tier * 0.04,
 		AvatarUserId = Constants.INFLUENCER_AVATARS[rec.Name],
+		Scale = StationSpecs.SCALE,
 	}
 end
 

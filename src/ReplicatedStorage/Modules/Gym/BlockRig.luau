@@ -52,6 +52,7 @@ function BlockRig.Build(colors)
 	local skin = colors.Skin or Color3.fromRGB(234, 184, 146)
 	local shirt = colors.Shirt or Color3.fromRGB(80, 80, 90)
 	local pants = colors.Pants or Color3.fromRGB(40, 40, 46)
+	local k = colors.Scale or 1
 
 	local model = Instance.new("Model")
 	model.Name = "Rig"
@@ -59,8 +60,8 @@ function BlockRig.Build(colors)
 	for name, def in pairs(PARTS) do
 		local p = Instance.new("Part")
 		p.Name = name
-		p.Size = def[2]
-		p.CFrame = CFrame.new(def[1])
+		p.Size = def[2] * k
+		p.CFrame = CFrame.new(def[1] * k)
 		p.Material = Enum.Material.SmoothPlastic
 		p.TopSurface = Enum.SurfaceType.Smooth
 		p.BottomSurface = Enum.SurfaceType.Smooth
@@ -82,7 +83,7 @@ function BlockRig.Build(colors)
 		parts[name] = p
 	end
 	for _, j in ipairs(JOINTS) do
-		local name, p1, p0, pivot = j[1], parts[j[2]], parts[j[3]], j[4]
+		local name, p1, p0, pivot = j[1], parts[j[2]], parts[j[3]], j[4] * k
 		local m = Instance.new("Motor6D")
 		m.Name = name
 		m.Part0 = p0
@@ -93,7 +94,7 @@ function BlockRig.Build(colors)
 	end
 	local hum = Instance.new("Humanoid")
 	hum.RigType = Enum.HumanoidRigType.R15
-	hum.HipHeight = 2
+	hum.HipHeight = 2 * k
 	hum.Parent = model
 	local animator = Instance.new("Animator")
 	animator.Parent = hum

@@ -21,6 +21,9 @@ local Specs = require(script.Parent.StationSpecs)
 
 local Exercises = {}
 
+local K = Specs.SCALE -- equipment scale (station-local literals below are authored at scale 1)
+local HEAVY = 0 -- 0 (Common) .. 1 (Legendary): heavier weight = slower, grindier reps
+
 local rad = math.rad
 local sin, cos, pi = math.sin, math.cos, math.pi
 local IDENTITY = CFrame.new()
@@ -63,14 +66,19 @@ end
 -- ----------------------------------------------------------------------
 -- Per-athlete variation
 -- ----------------------------------------------------------------------
-function Exercises.Params(seed)
+function Exercises.Params(seed, rarity)
 	seed = seed or 1
+	rarity = rarity or 1
+	local heavy = math.clamp((rarity - 1) / 4, 0, 1)
 	local r = Random.new(seed)
 	return {
 		Seed = seed,
-		Reps = r:NextInteger(7, 11),
-		Rest = r:NextNumber(6, 11),
-		Tempo = r:NextNumber(0.9, 1.12), -- >1 = slower reps
+		Rarity = rarity,
+		Heavy = heavy,
+		-- heavier weight: fewer reps, longer rest, slower tempo
+		Reps = math.max(4, r:NextInteger(7, 11) - (rarity - 1)),
+		Rest = r:NextNumber(6, 11) + heavy * 4,
+		Tempo = r:NextNumber(0.9, 1.12) * (1 + 0.1 * heavy), -- >1 = slower reps
 		Offset = r:NextNumber(0, 40),
 		Stride = r:NextNumber(0.95, 1.05),
 		Look = r:NextNumber(-1, 1),
@@ -106,10 +114,11 @@ end
 local function repCurve(ph, i, n, f, workIsBack)
 	local fat = (i / math.max(n - 1, 1)) ^ 3
 	local a, b, c = f[1], f[2], f[3]
+	local grind = 1 + 0.45 * fat + 0.35 * HEAVY
 	if workIsBack then
-		c *= 1 + 0.45 * fat
+		c *= grind
 	else
-		a *= 1 + 0.45 * fat
+		a *= grind
 	end
 	local total = a + b + c
 	if total > 0.97 then
@@ -293,7 +302,7 @@ function Exercises.Treadmill(rig, S, t, P)
 			pitch = lerp(rad(-45), rad(12), smooth(u))
 		end
 		local raise = pitch < 0 and 0.5 * sin(-pitch) or 0
-		local sole = B * CFrame.new(s * 0.42, sp.BeltTop + lift + raise, z) * CFrame.Angles(pitch, 0, 0)
+		local sole = B * CFrame.new(s * math.abs(d.HipLocal.Left.X) * 0.85, sp.BeltTop + lift + raise, z) * CFrame.Angles(pitch, 0, 0)
 		local hip = rig:pivot(side .. "Hip")
 		rig:plantFoot(side, sole, hip + B:VectorToWorldSpace(Vector3.new(s * 0.3, 0, -4)))
 
@@ -349,7 +358,7 @@ function Exercises.Bike(rig, S, t, P)
 		local pos = c + Vector3.new(s * sp.PedalX, r * cos(a), -r * sin(a))
 		pedalPos[side] = pos
 		local ankling = rad(-8) + rad(14) * sin(a + 0.6)
-		local sole = B * CFrame.new(pos + Vector3.new(0, 0.09, 0.22)) * CFrame.Angles(ankling, 0, 0)
+		local sole = B * CFrame.new(pos + Vector3.new(0, 0.09, 0.22) * K) * CFrame.Angles(ankling, 0, 0)
 		local hip = rig:pivot(side .. "Hip")
 		rig:plantFoot(side, sole, hip + B:VectorToWorldSpace(Vector3.new(s * 0.25, 0.5, -4)))
 	end
@@ -386,7 +395,7 @@ function Exercises.BenchPress(rig, S, t, P)
 	local shL = toLocal(S, rig:pivot("LeftShoulder"))
 	local shR = toLocal(S, rig:pivot("RightShoulder"))
 	local shY, shZ = (shL.Y + shR.Y) / 2, (shL.Z + shR.Z) / 2
-	local gx = d.ShoulderHalfWidth + 0.38
+	local gx = d.ShoulderHalfWidth + 0.38 * d.Scale
 
 	local lock = Vector3.new(0, shY + d.ArmReach * 0.95, shZ - 0.05)
 	local chest = Vector3.new(0, shY + d.ChestDepth / 2 + Specs.BARBELL.ShaftDiameter / 2 + 0.08, shZ - 0.5)
@@ -406,13 +415,13 @@ function Exercises.BenchPress(rig, S, t, P)
 		bar = Vector3.new(0, lerp(lock.Y, chest.Y, p), lerp(lock.Z, chest.Z, p ^ 0.8))
 		-- tiny grind shake while pressing
 		if working == 1 then
-			bar += Vector3.new(wobble(P.Seed, t, 7) * 0.012, 0, 0)
+			bar += Vector3.new(wobble(P.Seed, t, 7) * (0.012 + 0.03 * HEAVY), wobble(P.Seed + 2, t, 5) * 0.02 * HEAVY, 0)
 		end
 	end
 
 	local barCF = B * CFrame.new(bar)
-	local restL = B * Vector3.new(-0.45, sp.PadTop + d.ChestDepth + 0.2, sp.PelvisZ + 0.75)
-	local restR = B * Vector3.new(0.45, sp.PadTop + d.ChestDepth + 0.2, sp.PelvisZ + 0.75)
+	local restL = B * Vector3.new(-0.45 * d.Scale, sp.PadTop + d.ChestDepth + 0.2 * d.Scale, sp.PelvisZ + 0.75 * d.Scale)
+	local restR = B * Vector3.new(0.45 * d.Scale, sp.PadTop + d.ChestDepth + 0.2 * d.Scale, sp.PelvisZ + 0.75 * d.Scale)
 	local gripL = restL:Lerp(barCF * Vector3.new(-gx, 0, 0), onBar)
 	local gripR = restR:Lerp(barCF * Vector3.new(gx, 0, 0), onBar)
 	armsToPoints(rig, S, gripL, gripR, Vector3.new(1.6, -1.6, -0.7))
@@ -493,7 +502,7 @@ function Exercises.LatPulldown(rig, S, t, P)
 	local lean = rad(6) + rad(14) * p
 	rig:setPelvis(B * CFrame.new(0, sp.SeatTop + d.PelvisDepth / 2 + 0.04, sp.SeatZ) * CFrame.Angles(lean * 0.5, 0, 0))
 	rig:set("Waist", CFrame.Angles(lean * 0.5 + breathe(t) * 0.015, 0, 0))
-	plantFeet(rig, S, 0.75, 0, sp.FootZ, rad(8), 0.4)
+	plantFeet(rig, S, 0.75 * K, 0, sp.FootZ, rad(8), 0.4)
 
 	local mid = toLocal(S, shoulderMid(rig))
 	local top = Vector3.new(0, mid.Y + d.ArmReach * 0.92, mid.Z - 0.45)
@@ -551,7 +560,7 @@ function Exercises.Squat(rig, S, t, P)
 
 	local stage, x, repIdx = timeline(t, P, 2.2, 3.2, 2.0)
 	local hook = B * CFrame.new(0, sp.HookY, sp.HookZ)
-	local restZ = -0.95
+	local restZ = -0.95 * K
 
 	-- where the body is + how deep
 	local z, depth, onBar, barOnBack = 0, 0, 1, 1
@@ -593,7 +602,7 @@ function Exercises.Squat(rig, S, t, P)
 	onBack = CFrame.new(onBack.Position) * (B - B.Position)
 	local barCF = hook:Lerp(onBack, barOnBack)
 
-	local gx = d.ShoulderHalfWidth + 0.5
+	local gx = d.ShoulderHalfWidth + 0.5 * d.Scale
 	local hipL, hipR = hipGrips(rig, S)
 	armsToPoints(rig, S,
 		hipL:Lerp(barCF * Vector3.new(-gx, 0, 0), onBar),
@@ -655,7 +664,7 @@ function Exercises.CableRow(rig, S, t, P)
 	-- feet on the angled foot plate
 	for _, side in ipairs({ "Left", "Right" }) do
 		local s = side == "Left" and -1 or 1
-		local sole = B * CFrame.new(s * 0.62, sp.PlateY, sp.PlateZ + 0.2) * CFrame.Angles(rad(62), 0, 0)
+		local sole = B * CFrame.new(s * 0.62 * K, sp.PlateY, sp.PlateZ + 0.2 * K) * CFrame.Angles(rad(62), 0, 0)
 		local hip = rig:pivot(side .. "Hip")
 		rig:plantFoot(side, sole, hip + B:VectorToWorldSpace(Vector3.new(s * 0.5, 3, -1)))
 	end
@@ -663,8 +672,8 @@ function Exercises.CableRow(rig, S, t, P)
 	local hCF = B * CFrame.new(handle)
 	local lt = rig:world("LowerTorso")
 	armsToPoints(rig, S,
-		(lt * Vector3.new(-0.6, 0.2, -1.2)):Lerp(hCF * Vector3.new(-0.2, 0.05, 0), onHandle),
-		(lt * Vector3.new(0.6, 0.2, -1.2)):Lerp(hCF * Vector3.new(0.2, 0.05, 0), onHandle),
+		(lt * Vector3.new(-0.6, 0.2, -1.2)):Lerp(hCF * (Vector3.new(-0.2, 0.05, 0) * K), onHandle),
+		(lt * Vector3.new(0.6, 0.2, -1.2)):Lerp(hCF * (Vector3.new(0.2, 0.05, 0) * K), onHandle),
 		Vector3.new(0.7, -1.2, 1.8))
 	rig:lookAt(B * Vector3.new(0, 3, -10), 0.7)
 
@@ -759,9 +768,9 @@ function Exercises.Deadlift(rig, S, t, P)
 	end
 
 	local function restPose()
-		standing(rig, S, 0.55, 1, t, P.Seed)
+		standing(rig, S, 0.55 * K, 1, t, P.Seed)
 		rig:setPelvis(rig:world("LowerTorso") + B:VectorToWorldSpace(Vector3.new(0, floorY, 0)))
-		plantFeet(rig, S, sp.FootX + 0.05, floorY, 0.55, rad(12), 0.5)
+		plantFeet(rig, S, sp.FootX + 0.05, floorY, 0.55 * K, rad(12), 0.5)
 		local l, r = hipGrips(rig, S)
 		armsToPoints(rig, S, l, r, Vector3.new(1.4, -0.6, 1.2))
 		standardLook(rig, S, t, P, Vector3.new(0, 5, -10))
@@ -920,6 +929,16 @@ function Exercises.Idle(rig, S, t, P)
 	relaxArm(rig, "Right", rad(2), rad(6), rad(10), t, P.Seed + 1)
 	standardLook(rig, S, t, P, Vector3.new(0, 5, -10))
 	return E()
+end
+
+-- Every exercise reads HEAVY (set from the athlete's rarity) while it runs.
+for name, fn in pairs(Exercises) do
+	if type(fn) == "function" and name ~= "Params" then
+		Exercises[name] = function(rig, S, t, P)
+			HEAVY = P.Heavy or 0
+			return fn(rig, S, t, P)
+		end
+	end
 end
 
 return Exercises

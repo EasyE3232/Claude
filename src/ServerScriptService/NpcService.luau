@@ -131,7 +131,7 @@ end
 
 --[[
 	opts = {
-		Name, Skin, Shirt, Pants, Height, Width, Depth, AvatarUserId,
+		Name, Skin, Shirt, Pants, Height, Width, Depth, AvatarUserId, Scale,
 		Face = true (adds the classic face decal when the head has none)
 	}
 ]]
@@ -140,7 +140,12 @@ function NpcService.CreateRig(opts)
 	local desc = buildDescription(opts)
 	local model, isBlock = createModel(desc)
 	if isBlock then
-		model = BlockRig.Build({ Skin = opts.Skin, Shirt = opts.Shirt, Pants = opts.Pants })
+		model = BlockRig.Build({ Skin = opts.Skin, Shirt = opts.Shirt, Pants = opts.Pants, Scale = opts.Scale })
+	elseif opts.Scale and opts.Scale ~= 1 then
+		-- bigger-than-life influencers to match the oversized equipment
+		pcall(function()
+			model:ScaleTo(opts.Scale)
+		end)
 	end
 	model.Name = opts.Name or "NPC"
 
@@ -324,7 +329,7 @@ end
 -- ----------------------------------------------------------------------
 -- Movement controller
 -- ----------------------------------------------------------------------
-local AGENT = { AgentRadius = 2, AgentHeight = 5.5, AgentCanJump = true, WaypointSpacing = 6 }
+local AGENT = { AgentRadius = 2, AgentHeight = 7.2, AgentCanJump = true, WaypointSpacing = 6 }
 
 local losParams = RaycastParams.new()
 losParams.CollisionGroup = NpcService.GROUP_NPC

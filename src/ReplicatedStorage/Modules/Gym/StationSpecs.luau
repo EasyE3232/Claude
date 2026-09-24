@@ -7,35 +7,40 @@
 	Station-local space: origin on the floor at the station's center, +Y up,
 	the athlete faces -Z (LookVector) unless noted.
 
-	Slots 1-6 are floor 1, 7-12 floor 2, 13-18 floor 3. Buying a Gym Floor
-	(Shop) unlocks that floor's 6 machines.
+	Every gym has 3 of each machine, grouped side by side:
+	  Floor 1 (free)   slots 1-12  : 3 Treadmill, 3 Bike, 3 Dumbbell Curl, 3 Shoulder Press
+	  Floor 2 (bought) slots 13-24 : 3 Lat Pulldown, 3 Cable Row, 3 Leg Extension, 3 Pull-Up
+	  Floor 3 (bought) slots 25-33 : 3 Squat, 3 Deadlift, 3 Bench Press
+
+	SCALE: equipment (and the influencers who use it) is built bigger than
+	real-world proportions so it reads well in Roblox. The tables below are
+	authored at scale 1 (StationSpecs.RAW, used by the map builder, which then
+	scales the finished model); StationSpecs[kind] holds the scaled numbers
+	the animation code uses.
 ]]
 
 local StationSpecs = {}
 
-StationSpecs.SLOT_EXERCISES = {
-	-- Floor 1: cardio & dumbbells (free)
-	"Treadmill", -- 1
-	"Treadmill", -- 2
-	"Bike", -- 3
-	"DumbbellCurl", -- 4
-	"ShoulderPress", -- 5
-	"BenchPress", -- 6
-	-- Floor 2: machines
-	"LatPulldown", -- 7
-	"CableRow", -- 8
-	"PullUp", -- 9
-	"LegExtension", -- 10
-	"Bike", -- 11
-	"Treadmill", -- 12
-	-- Floor 3: power zone
-	"Squat", -- 13
-	"Squat", -- 14
-	"Deadlift", -- 15
-	"BenchPress", -- 16
-	"BenchPress", -- 17
-	"Deadlift", -- 18
+StationSpecs.SCALE = 1.25
+
+local GROUPS = {
+	{ "Treadmill", "Bike", "DumbbellCurl", "ShoulderPress" },
+	{ "LatPulldown", "CableRow", "LegExtension", "PullUp" },
+	{ "Squat", "Deadlift", "BenchPress" },
 }
+StationSpecs.FLOOR_GROUPS = GROUPS
+StationSpecs.SLOT_EXERCISES = {}
+StationSpecs.FLOOR_OF_SLOT = {}
+StationSpecs.FLOOR_FIRST_SLOT = {}
+for f, kinds in ipairs(GROUPS) do
+	StationSpecs.FLOOR_FIRST_SLOT[f] = #StationSpecs.SLOT_EXERCISES + 1
+	for _, kind in ipairs(kinds) do
+		for _ = 1, 3 do
+			table.insert(StationSpecs.SLOT_EXERCISES, kind)
+			StationSpecs.FLOOR_OF_SLOT[#StationSpecs.SLOT_EXERCISES] = f
+		end
+	end
+end
 
 StationSpecs.FLOOR_NAMES = { "CARDIO & DUMBBELLS", "MACHINES", "POWER ZONE" }
 
@@ -61,7 +66,7 @@ StationSpecs.BARBELL = {
 	SleeveDiameter = 0.2,
 	PlateDiameter = 1.5,
 	PlateThickness = 0.16,
-	Plates = 2, -- plates per side
+	Plates = 5, -- plate slots per side (rarer athletes load more of them)
 }
 
 StationSpecs.Treadmill = {
@@ -200,5 +205,30 @@ StationSpecs.PullUp = {
 	PlateHeight = 0.2,
 	Footprint = Vector3.new(4.4, 0, 4.2),
 }
+
+-- ----------------------------------------------------------------------
+-- Scaling: keep the raw (scale 1) tables for the map builder, publish scaled
+-- copies for animation. Counts/rates are not lengths and are not scaled.
+-- ----------------------------------------------------------------------
+local NOT_LENGTH = { Cadence = true, Slats = true, StackPlates = true, Plates = true }
+local RAW = {}
+StationSpecs.RAW = RAW
+local SPEC_KEYS = { "BARBELL", "Treadmill", "Bike", "BenchPress", "DumbbellCurl", "LatPulldown", "Squat",
+	"CableRow", "LegExtension", "Deadlift", "ShoulderPress", "PullUp" }
+for _, key in ipairs(SPEC_KEYS) do
+	local raw = StationSpecs[key]
+	RAW[key] = raw
+	local scaled = {}
+	for k, v in pairs(raw) do
+		if NOT_LENGTH[k] then
+			scaled[k] = v
+		elseif type(v) == "number" or typeof(v) == "Vector3" then
+			scaled[k] = v * StationSpecs.SCALE
+		else
+			scaled[k] = v
+		end
+	end
+	StationSpecs[key] = scaled
+end
 
 return StationSpecs
