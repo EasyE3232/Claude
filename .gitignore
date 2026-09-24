@@ -1,0 +1,4 @@
+build/*
+!build/GymWars.rbxlx
+sourcemap.json
+__pycache__/

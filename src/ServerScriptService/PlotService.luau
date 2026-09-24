@@ -1,0 +1,318 @@
+--[[
+	PlotService
+	Assigns the 10 gym lots to players, handles sign text, gym colors,
+	station unlock visuals and teleporting players home.
+
+	Each plot model (GymWarsMap.Plots.PlotN) contains:
+	  Floor, WallBack/WallLeft/WallRight, Sign, FrontDesk, DeskSpawn, PlotSpawn,
+	  WorkoutStation (owner's heavy bag), GymZone (interior volume),
+	  Stations/Station1..Station12 (see tools/map/Stations.luau)
+	Parts tagged with the "ColorRole" attribute ("Wall" / "Accent" / "AccentDim")
+	are recolored by the owner's gym color preset.
+]]
+
+local Players = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
+
+local Constants = require(RS.Modules.Constants)
+local StationSpecs = require(RS.Modules.Gym.StationSpecs)
+
+local PlotService = {}
+
+local plots = {} -- [plotId] = plot record
+local ownerToPlot = {} -- [userId] = plotId
+
+local DEFAULT_COLOR = 3 -- "Ice" (blue accents, like the reference gym)
+local LOCKED_COLOR = Color3.fromRGB(28, 30, 38)
+local OPEN_COLOR = Color3.fromRGB(90, 220, 150)
+
+-- ----------------------------------------------------------------------
+local function makeSignGui(signPart)
+	local gui = signPart:FindFirstChild("SignGui")
+	if gui then
+		return gui
+	end
+	gui = Instance.new("SurfaceGui")
+	gui.Name = "SignGui"
+	gui.Face = Enum.NormalId.Front
+	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	gui.PixelsPerStud = 30
+	gui.LightInfluence = 0
+	gui.Parent = signPart
+
+	local label = Instance.new("TextLabel")
+	label.Name = "Label"
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBlack
+	label.TextScaled = true
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.TextStrokeTransparency = 0.4
+	label.Text = "OPEN GYM"
+	label.Parent = gui
+	return gui
+end
+
+local function lockTag(pad)
+	local tag = pad:FindFirstChild("LockTag")
+	if tag then
+		return tag
+	end
+	tag = Instance.new("BillboardGui")
+	tag.Name = "LockTag"
+	tag.Size = UDim2.new(0, 150, 0, 40)
+	tag.StudsOffsetWorldSpace = Vector3.new(0, 4.5, 0)
+	tag.MaxDistance = 45
+	tag.LightInfluence = 0
+	tag.Parent = pad
+	local label = Instance.new("TextLabel")
+	label.Name = "Label"
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBlack
+	label.TextScaled = true
+	label.TextColor3 = Color3.fromRGB(255, 255, 255)
+	label.TextStrokeTransparency = 0.3
+	label.Parent = tag
+	return tag
+end
+
+-- ----------------------------------------------------------------------
+function PlotService.Init()
+	local folder = workspace:WaitForChild("GymWarsMap"):WaitForChild("Plots")
+	for i = 1, Constants.PLOT_COUNT do
+		local model = folder:FindFirstChild("Plot" .. i)
+		if model then
+			model:SetAttribute("PlotId", i)
+			model:SetAttribute("OwnerUserId", 0)
+			local plot = {
+				Id = i,
+				Model = model,
+				OwnerUserId = 0,
+				Slots = {}, -- [slotIndex] = influencer record
+				Unlocked = 0,
+				Stations = {},
+				Roles = { Wall = {}, Accent = {}, AccentDim = {} },
+			}
+			local stations = model:FindFirstChild("Stations")
+			for k = 1, Constants.RACK_SLOT_MAX do
+				plot.Stations[k] = stations and stations:FindFirstChild("Station" .. k)
+			end
+			for _, d in ipairs(model:GetDescendants()) do
+				local role = d:IsA("BasePart") and d:GetAttribute("ColorRole")
+				if role and plot.Roles[role] then
+					table.insert(plot.Roles[role], d)
+				end
+			end
+			plots[i] = plot
+			makeSignGui(model:WaitForChild("Sign"))
+			PlotService.SetSignText(i, "OPEN GYM")
+			PlotService.ApplyColor(i, DEFAULT_COLOR)
+			PlotService.RefreshSlots(i, 0)
+		else
+			warn("[PlotService] Missing Plot" .. i .. " in GymWarsMap.Plots")
+		end
+	end
+end
+
+function PlotService.GetPlotById(id)
+	return plots[id]
+end
+
+function PlotService.GetPlotByOwner(userId)
+	local id = ownerToPlot[userId]
+	return id and plots[id] or nil
+end
+
+function PlotService.GetAllPlots()
+	return plots
+end
+
+function PlotService.GetStation(plotId, slot)
+	local plot = plots[plotId]
+	return plot and plot.Stations[slot] or nil
+end
+
+function PlotService.StationName(station)
+	local kind = station:GetAttribute("Exercise")
+	return StationSpecs.DISPLAY_NAMES[kind] or kind or "machine"
+end
+
+-- Walk up from any instance to find which plot it belongs to.
+function PlotService.GetPlotFromInstance(inst)
+	local node = inst
+	while node and node ~= workspace do
+		local id = node:GetAttribute("PlotId")
+		if id then
+			return plots[id]
+		end
+		node = node.Parent
+	end
+	return nil
+end
+
+function PlotService.IsInsideGym(plot, point)
+	local zone = plot and plot.Model:FindFirstChild("GymZone")
+	if not zone then
+		return false
+	end
+	local rel = zone.CFrame:PointToObjectSpace(point)
+	local half = zone.Size / 2
+	return math.abs(rel.X) <= half.X and math.abs(rel.Y) <= half.Y and math.abs(rel.Z) <= half.Z
+end
+
+-- ----------------------------------------------------------------------
+function PlotService.AssignPlot(player)
+	if ownerToPlot[player.UserId] then
+		return plots[ownerToPlot[player.UserId]]
+	end
+	for i = 1, Constants.PLOT_COUNT do
+		local plot = plots[i]
+		if plot and plot.OwnerUserId == 0 then
+			plot.OwnerUserId = player.UserId
+			plot.Model:SetAttribute("OwnerUserId", player.UserId)
+			ownerToPlot[player.UserId] = i
+			player:SetAttribute("PlotId", i)
+			PlotService.SetSignText(i, player.DisplayName .. "'s Gym")
+			return plot
+		end
+	end
+	return nil
+end
+
+function PlotService.ReleasePlot(player)
+	local id = ownerToPlot[player.UserId]
+	if not id then
+		return
+	end
+	local plot = plots[id]
+	plot.OwnerUserId = 0
+	plot.Model:SetAttribute("OwnerUserId", 0)
+	plot.Slots = {}
+	ownerToPlot[player.UserId] = nil
+	PlotService.SetSignText(id, "OPEN GYM")
+	PlotService.ApplyColor(id, DEFAULT_COLOR)
+	PlotService.RefreshSlots(id, 0)
+end
+
+-- ----------------------------------------------------------------------
+function PlotService.SetSignText(plotId, text)
+	local plot = plots[plotId]
+	local sign = plot and plot.Model:FindFirstChild("Sign")
+	local gui = sign and sign:FindFirstChild("SignGui")
+	local label = gui and gui:FindFirstChild("Label")
+	if label then
+		label.Text = text
+	end
+end
+
+function PlotService.ApplyColor(plotId, presetIndex)
+	local plot = plots[plotId]
+	local preset = Constants.GYM_COLORS[presetIndex] or Constants.GYM_COLORS[DEFAULT_COLOR]
+	if not plot or not preset then
+		return
+	end
+	-- keep walls dark like a real gym: tint the preset wall color toward black
+	local wall = preset.Wall:Lerp(Color3.fromRGB(14, 14, 16), 0.45)
+	local dim = preset.Accent:Lerp(Color3.fromRGB(40, 44, 52), 0.55)
+	for _, p in ipairs(plot.Roles.Wall) do
+		p.Color = wall
+	end
+	for _, p in ipairs(plot.Roles.Accent) do
+		p.Color = preset.Accent
+	end
+	for _, p in ipairs(plot.Roles.AccentDim) do
+		p.Color = dim
+	end
+	plot.Model:SetAttribute("AccentColor", preset.Accent)
+end
+
+-- Lights up the first `unlockedCount` stations' floor pads, dims the rest.
+function PlotService.RefreshSlots(plotId, unlockedCount)
+	local plot = plots[plotId]
+	if not plot then
+		return
+	end
+	plot.Unlocked = unlockedCount
+	for k = 1, Constants.RACK_SLOT_MAX do
+		local station = plot.Stations[k]
+		if station then
+			local open = k <= unlockedCount
+			local color = open and OPEN_COLOR or LOCKED_COLOR
+			local pad = station:FindFirstChild("Pad")
+			if pad then
+				pad.Color = color
+				pad.Material = open and Enum.Material.Neon or Enum.Material.SmoothPlastic
+				pad.Transparency = open and 0.35 or 0.2
+				local tag = lockTag(pad)
+				tag.Enabled = plot.OwnerUserId ~= 0
+				tag.Label.Text = open and PlotService.StationName(station) or "LOCKED — upgrade Rack Slots"
+				tag.Label.TextColor3 = open and Color3.fromRGB(190, 255, 215) or Color3.fromRGB(255, 150, 150)
+			end
+			local outline = station:FindFirstChild("Outline")
+			if outline then
+				for _, e in ipairs(outline:GetChildren()) do
+					if e:IsA("BasePart") then
+						e.Color = color
+						e.Material = open and Enum.Material.Neon or Enum.Material.SmoothPlastic
+					end
+				end
+			end
+		end
+	end
+end
+
+function PlotService.GetSlotPart(plotId, k)
+	local station = PlotService.GetStation(plotId, k)
+	return station and station:FindFirstChild("Pad") or nil
+end
+
+function PlotService.FindOpenSlot(plotId)
+	local plot = plots[plotId]
+	if not plot then
+		return nil
+	end
+	for k = 1, plot.Unlocked do
+		if not plot.Slots[k] and plot.Stations[k] then
+			return k
+		end
+	end
+	return nil
+end
+
+function PlotService.CountPlaced(plotId)
+	local plot = plots[plotId]
+	if not plot then
+		return 0
+	end
+	local n = 0
+	for _ in pairs(plot.Slots) do
+		n += 1
+	end
+	return n
+end
+
+-- ----------------------------------------------------------------------
+function PlotService.TeleportToPlot(player, plot)
+	local character = player.Character
+	local spawnPart = plot and plot.Model:FindFirstChild("PlotSpawn")
+	if not character or not spawnPart then
+		return
+	end
+	if not character:FindFirstChild("HumanoidRootPart") then
+		return
+	end
+	-- face out the front door toward the red carpet
+	local from = spawnPart.Position + Vector3.new(0, 1, 0)
+	local lookAt = Vector3.new(0, from.Y, from.Z)
+	character:PivotTo(CFrame.lookAt(from, lookAt))
+end
+
+function PlotService.GetOwnerPlayer(plot)
+	if not plot or plot.OwnerUserId == 0 then
+		return nil
+	end
+	return Players:GetPlayerByUserId(plot.OwnerUserId)
+end
+
+return PlotService
