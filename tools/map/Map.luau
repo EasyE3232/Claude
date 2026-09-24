@@ -1,7 +1,7 @@
 --[[
 	Map — the long, linear world: a red-carpet boulevard with the conveyor
-	down the middle, 5 gym lots on each side (10 total), hedge walls and a
-	gate at each end.
+	down the middle, 4 gym lots on each side (8 total) spread far apart on big
+	lawns, hedge walls and a gate at each end.
 
 	World axes: the conveyor runs along +Z (from the DROP tunnel at -Z to the
 	EXIT tunnel at +Z). Lots face the carpet.
@@ -15,12 +15,12 @@ local Pal = Geo.Palette
 local M = Enum.Material
 local rad = math.rad
 
-Map.HALF_X = 170
-Map.HALF_Z = 370
-Map.LOT_Z = { -240, -120, 0, 120, 240 }
-Map.LOT_X = 92 -- gym center distance from the carpet center line
-Map.BELT_Z0 = -338
-Map.BELT_Z1 = 338
+Map.HALF_X = 195
+Map.HALF_Z = 470
+Map.LOT_Z = { -330, -110, 110, 330 } -- 220 studs between gyms
+Map.LOT_X = 104 -- gym center distance from the carpet center line (front door at 72)
+Map.BELT_Z0 = -438
+Map.BELT_Z1 = 438
 Map.BELT_TOP = 1.0
 Map.BELT_WIDTH = 7
 Map.CARPET_HALF = 15
@@ -199,16 +199,36 @@ function Map.Build(workspace)
 			-- lot concrete apron around the building
 			Geo.decorate(Geo.part(env, "LotApron", Vector3.new(Gym.D + 8, 0.06, Gym.W + 8), CFrame.new(side * Map.LOT_X, 0.03, z), Color3.fromRGB(120, 120, 124), M.Concrete))
 		end
-		-- trees between lots
-		for i = 1, #Map.LOT_Z - 1 do
-			local zMid = (Map.LOT_Z[i] + Map.LOT_Z[i + 1]) / 2
-			for _, x in ipairs({ 58, 92, 126 }) do
-				tree(env, Vector3.new(side * x, 0, zMid + (x % 3) * 2), 1 + (x % 5) * 0.05)
+		-- lawns: scattered trees between and behind the gyms (deterministic)
+		local r = Random.new(side > 0 and 11 or 23)
+		local zs = { -Map.HALF_Z + 40 }
+		for _, lz in ipairs(Map.LOT_Z) do
+			table.insert(zs, lz)
+		end
+		table.insert(zs, Map.HALF_Z - 40)
+		for i = 1, #zs - 1 do
+			local z0 = zs[i] + (i == 1 and 0 or 50)
+			local z1 = zs[i + 1] - (i == #zs - 1 and 0 or 50)
+			if z1 - z0 > 20 then
+				for _ = 1, 6 do
+					tree(env, Vector3.new(side * r:NextNumber(34, Map.HALF_X - 14), 0, r:NextNumber(z0, z1)), r:NextNumber(0.9, 1.25))
+				end
 			end
 		end
-		for _, zEnd in ipairs({ -310, 310 }) do
-			for _, x in ipairs({ 60, 110, 150 }) do
-				tree(env, Vector3.new(side * x, 0, zEnd), 1.1)
+		for _, lz in ipairs(Map.LOT_Z) do
+			-- trees behind each gym
+			for _, dz in ipairs({ -30, 0, 30 }) do
+				tree(env, Vector3.new(side * (Map.HALF_X - 16), 0, lz + dz + r:NextNumber(-6, 6)), r:NextNumber(0.9, 1.2))
+			end
+			-- park benches facing the walkway
+			for _, dz in ipairs({ -12, 12 }) do
+				local seatPos = Vector3.new(side * 50, 0, lz + dz)
+				local cf = CFrame.lookAt(seatPos, Vector3.new(side * 50, 0, lz))
+				Geo.part(env, "ParkBenchSeat", Vector3.new(6, 0.4, 1.8), cf * CFrame.new(0, 1.6, 0), Color3.fromRGB(120, 84, 52), M.WoodPlanks)
+				Geo.part(env, "ParkBenchBack", Vector3.new(6, 1.6, 0.3), cf * CFrame.new(0, 2.6, 0.85), Color3.fromRGB(120, 84, 52), M.WoodPlanks)
+				for _, sx in ipairs({ -2.6, 2.6 }) do
+					Geo.part(env, "ParkBenchLeg", Vector3.new(0.3, 1.6, 1.6), cf * CFrame.new(sx, 0.8, 0), Pal.FrameDark, M.Metal)
+				end
 			end
 		end
 	end
@@ -218,7 +238,7 @@ function Map.Build(workspace)
 	spawn.Name = "SpawnLocation"
 	spawn.Anchored = true
 	spawn.Size = Vector3.new(12, 1, 12)
-	spawn.CFrame = CFrame.new(28, 0.5, -330)
+	spawn.CFrame = CFrame.new(30, 0.5, -Map.HALF_Z + 40)
 	spawn.Color = GOLD
 	spawn.Material = M.Foil
 	spawn.TopSurface = Enum.SurfaceType.Smooth

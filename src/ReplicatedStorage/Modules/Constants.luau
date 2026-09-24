@@ -15,17 +15,19 @@ Constants.AUTOSAVE_INTERVAL = 60 -- seconds
 -- ======================================================================
 -- MAP  (linear map: 5 gyms on each side of a long red-carpet conveyor)
 -- ======================================================================
-Constants.PLOT_COUNT = 10
-Constants.RACK_SLOT_MAX = 12 -- equipment stations per gym (Station1..Station12)
+Constants.PLOT_COUNT = 8
+Constants.FLOOR_COUNT = 3 -- every gym is a 3-story building
+Constants.MACHINES_PER_FLOOR = 6
+Constants.RACK_SLOT_MAX = 18 -- equipment stations per gym (Station1..Station18, 6 per floor)
 
 -- ======================================================================
 -- SHARED CONVEYOR (runs down the middle of the map along +Z)
 -- Start/end points come from the BeltStart / BeltEnd parts in the map.
 -- ======================================================================
 Constants.BELT = {
-	SpawnInterval = 4, -- seconds between spawns
-	MaxOnBelt = 18, -- cap on how many ride the belt at once
-	Speed = 7, -- studs per second (the belt part's conveyor velocity)
+	SpawnInterval = 3.5, -- seconds between spawns
+	MaxOnBelt = 26, -- cap on how many ride the belt at once
+	Speed = 8, -- studs per second (the belt part's conveyor velocity)
 	ClaimDistance = 11, -- ProximityPrompt activation range
 	ClaimHold = 0.3, -- seconds to hold the prompt
 	DroppedDespawn = 60, -- seconds a dropped, unowned influencer waits before leaving
@@ -136,15 +138,15 @@ Constants.CLOTHING = {
 -- EQUIPMENT  (permanent gym upgrades, Cash only, survive rebirth)
 -- Level 1 is the starting level. Costs[n] is the price to go from level n-1 to n.
 -- ======================================================================
-Constants.EQUIPMENT_ORDER = { "RackSlots", "WorkoutGain", "DeskSpeed" }
+Constants.EQUIPMENT_ORDER = { "Floors", "WorkoutGain", "DeskSpeed" }
 
 Constants.EQUIPMENT = {
-	RackSlots = {
-		Name = "Rack Slots",
-		Desc = "How many influencers your gym can hold",
-		Values = { 4, 6, 8, 10, 12 },
-		Costs = { 0, 1500, 6000, 20000, 60000 },
-		Unit = " slots",
+	Floors = {
+		Name = "Gym Floors",
+		Desc = "Open another floor of your gym (+6 machines)",
+		Values = { 6, 12, 18 }, -- machines available (floor 1, floors 1-2, floors 1-3)
+		Costs = { 0, 7500, 45000 },
+		Unit = " machines",
 	},
 	WorkoutGain = {
 		Name = "Heavier Weights",

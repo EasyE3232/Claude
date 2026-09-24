@@ -599,7 +599,7 @@ local function checkArrivedHome(player, rec)
 		local now = os.clock()
 		if not rackFullDebounce[player.UserId] or now - rackFullDebounce[player.UserId] > 4 then
 			rackFullDebounce[player.UserId] = now
-			Notify(player, "Every unlocked machine is taken! Upgrade Rack Slots in the Shop.", "fail")
+			Notify(player, "Every machine on your open floors is taken! Buy another Gym Floor in the Shop.", "fail")
 		end
 		return
 	end

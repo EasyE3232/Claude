@@ -38,7 +38,7 @@ local function defaultProfile()
 		Rebirths = 0,
 		OwnedClothing = {}, -- [clothingId] = true
 		Equipped = {}, -- [slotName] = clothingId
-		Equipment = { RackSlots = 1, WorkoutGain = 1, DeskSpeed = 1 },
+		Equipment = { Floors = 1, WorkoutGain = 1, DeskSpeed = 1 },
 		GymColor = 3,
 		Placed = {}, -- list of { Rarity = index, Name = string, Slot = number, Seed = number }
 	}

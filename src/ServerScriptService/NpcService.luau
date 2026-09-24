@@ -474,7 +474,8 @@ end
 local function steer(c, goal, arriveDist)
 	local pos = c.Root.Position
 	local d = flat(goal - pos).Magnitude
-	if d <= arriveDist then
+	-- same floor check: a machine directly above/below isn't "arrived"
+	if d <= arriveDist and math.abs(goal.Y - pos.Y) < 6 then
 		c.Humanoid:MoveTo(pos)
 		c.Waypoints = nil
 		return true

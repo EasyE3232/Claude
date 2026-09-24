@@ -90,7 +90,7 @@ local function buyEquipment(player, profile, id)
 	-- apply side effects immediately
 	local plot = PlotService.GetPlotByOwner(player.UserId)
 	if plot then
-		if id == "RackSlots" then
+		if id == "Floors" then
 			PlotService.RefreshSlots(plot.Id, def.Values[level + 1])
 			player:SetAttribute("RackSlots", def.Values[level + 1])
 		end

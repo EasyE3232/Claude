@@ -7,25 +7,37 @@
 	Station-local space: origin on the floor at the station's center, +Y up,
 	the athlete faces -Z (LookVector) unless noted.
 
-	Slot order = unlock order (RackSlots upgrade gives 4, 6, 8, 10, 12 slots).
+	Slots 1-6 are floor 1, 7-12 floor 2, 13-18 floor 3. Buying a Gym Floor
+	(Shop) unlocks that floor's 6 machines.
 ]]
 
 local StationSpecs = {}
 
 StationSpecs.SLOT_EXERCISES = {
+	-- Floor 1: cardio & dumbbells (free)
 	"Treadmill", -- 1
-	"BenchPress", -- 2
-	"DumbbellCurl", -- 3
-	"Bike", -- 4
-	"LatPulldown", -- 5
-	"Squat", -- 6
-	"CableRow", -- 7
-	"LegExtension", -- 8
-	"Treadmill", -- 9
-	"Deadlift", -- 10
-	"ShoulderPress", -- 11
-	"PullUp", -- 12
+	"Treadmill", -- 2
+	"Bike", -- 3
+	"DumbbellCurl", -- 4
+	"ShoulderPress", -- 5
+	"BenchPress", -- 6
+	-- Floor 2: machines
+	"LatPulldown", -- 7
+	"CableRow", -- 8
+	"PullUp", -- 9
+	"LegExtension", -- 10
+	"Bike", -- 11
+	"Treadmill", -- 12
+	-- Floor 3: power zone
+	"Squat", -- 13
+	"Squat", -- 14
+	"Deadlift", -- 15
+	"BenchPress", -- 16
+	"BenchPress", -- 17
+	"Deadlift", -- 18
 }
+
+StationSpecs.FLOOR_NAMES = { "CARDIO & DUMBBELLS", "MACHINES", "POWER ZONE" }
 
 StationSpecs.DISPLAY_NAMES = {
 	Treadmill = "Treadmill",

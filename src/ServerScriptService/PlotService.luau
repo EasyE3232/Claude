@@ -1,12 +1,13 @@
 --[[
 	PlotService
-	Assigns the 10 gym lots to players, handles sign text, gym colors,
+	Assigns the 8 gym lots to players, handles sign text, gym colors,
 	station unlock visuals and teleporting players home.
 
 	Each plot model (GymWarsMap.Plots.PlotN) contains:
 	  Floor, WallBack/WallLeft/WallRight, Sign, FrontDesk, DeskSpawn, PlotSpawn,
 	  WorkoutStation (owner's heavy bag), GymZone (interior volume),
-	  Stations/Station1..Station12 (see tools/map/Stations.luau)
+	  Stations/Station1..Station18 (6 per floor, see tools/map/Stations.luau),
+	  FloorGates/GateN (blocks the stairs to floor N until it's bought)
 	Parts tagged with the "ColorRole" attribute ("Wall" / "Accent" / "AccentDim")
 	are recolored by the owner's gym color preset.
 ]]
@@ -234,6 +235,23 @@ function PlotService.RefreshSlots(plotId, unlockedCount)
 		return
 	end
 	plot.Unlocked = unlockedCount
+	-- stair gates: floor N opens once its first machine is unlocked
+	local gates = plot.Model:FindFirstChild("FloorGates")
+	if gates then
+		for _, gate in ipairs(gates:GetChildren()) do
+			local floor = gate:GetAttribute("Floor")
+			if floor and gate:IsA("BasePart") then
+				local open = unlockedCount >= (floor - 1) * Constants.MACHINES_PER_FLOOR + 1
+				gate.CanCollide = not open
+				gate.Transparency = open and 1 or 0.35
+				for _, gui in ipairs(gate:GetChildren()) do
+					if gui:IsA("SurfaceGui") then
+						gui.Enabled = not open
+					end
+				end
+			end
+		end
+	end
 	for k = 1, Constants.RACK_SLOT_MAX do
 		local station = plot.Stations[k]
 		if station then
@@ -246,7 +264,7 @@ function PlotService.RefreshSlots(plotId, unlockedCount)
 				pad.Transparency = open and 0.35 or 0.2
 				local tag = lockTag(pad)
 				tag.Enabled = plot.OwnerUserId ~= 0
-				tag.Label.Text = open and PlotService.StationName(station) or "LOCKED — upgrade Rack Slots"
+				tag.Label.Text = open and PlotService.StationName(station) or "LOCKED — buy this floor"
 				tag.Label.TextColor3 = open and Color3.fromRGB(190, 255, 215) or Color3.fromRGB(255, 150, 150)
 			end
 			local outline = station:FindFirstChild("Outline")

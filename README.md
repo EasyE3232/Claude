@@ -12,9 +12,10 @@ and play-test with **Graphics Quality 8+**. Future lighting is enabled.
 
 | Area | What it is |
 |---|---|
-| **Map** | 340 × 740-stud linear field. The conveyor runs down a red-carpet boulevard (velvet ropes, gold trim, street lamps). **10 gym lots**, 5 per side, 120 studs apart. Hedge walls, gates, a DROP tunnel where influencers appear, and an EXIT tunnel. |
-| **Gyms** | 84 × 96 × 18 buildings modeled on the reference photo: dark rubber floor with zone lines, wood cardio area facing daylit windows with blinds, TVs above the treadmills, blue striped feature wall, mirror wall with a dumbbell rack, exposed foil ducts, LED strip lighting (real SurfaceLights), columns, a glass storefront, a reception desk and a heavy bag. |
-| **12 working stations per gym** | Treadmill ×2, Bench Press, Dumbbell Curls, Spin Bike, Lat Pulldown, Squat Rack, Seated Cable Row, Leg Extension, Deadlift Platform, Seated DB Shoulder Press, Chin/Dip Assist. They unlock in that order with the Rack Slots upgrade (4, 6, 8, 10, 12). A lit floor pad plus outline shows which ones are unlocked. Extra decor equipment fills out the floor. |
+| **Map** | 390 × 940-stud linear field. The conveyor runs down a red-carpet boulevard (velvet ropes, gold trim, street lamps). **8 gym lots**, 4 per side, **220 studs apart** on big tree-filled lawns with park benches. Hedge walls, gates, a DROP tunnel where influencers appear, and an EXIT tunnel. |
+| **Gyms** | **3-story glass fitness clubs** (76 × 64, 16-stud floors): dark frame, full-height glass on three sides, floor bands, a rooftop sign. Inside every floor: two tidy rows of 3 machines facing the glass, an aisle runner, a mirror wall with a dumbbell rack, a blue-striped stair-core wall with a floor sign, exposed ducts, and LED strip lighting (real SurfaceLights). The ground floor has the lobby, front desk and heavy bag. |
+| **Floors = capacity** | Floor 1 (Cardio & Dumbbells) is free and gives 6 machines. **Floor 2 (Machines)** and **Floor 3 (Power Zone)** are bought in the Shop as the *Gym Floors* upgrade ($7,500 / $45,000) and add 6 machines each. A red gate blocks the stairs until that floor is bought. |
+| **18 working stations per gym** | F1: 2 treadmills, spin bike, dumbbell curls, DB shoulder press, bench press. F2: lat pulldown, cable row, chin/dip assist, leg extension, spin bike, treadmill. F3: 2 squat racks, 2 deadlift platforms, 2 bench presses. |
 | **Influencers** | Real R15 avatars (`CreateHumanoidModelFromDescriptionAsync`), dressed in their rarity color, bulkier at higher rarities, sparkles on Epic and Legendary. They ride the conveyor physically and do emotes (wave, cheer, dance). |
 | **Claiming** | Hold **E** on one. They hop off the belt and **walk behind you at 11 speed while you move at 18**, pathfinding around walls. Once they step inside your gym, they walk to the next open machine and start training. Press **X** to let go. |
 | **Stealing** | Lure a training influencer out of someone else's gym. That gym's front desk worker (a real R15 NPC) runs after you and pathfinds anywhere on the map. If you're caught, you get tackled and the influencer walks back to its machine. |
@@ -53,7 +54,7 @@ Motion is procedural and runs on every client, with no uploaded animation assets
 
 Everything lives in `src/ReplicatedStorage/Modules/Constants.luau`:
 `NPC.FollowSpeed` (escort pace), `BELT.Speed/SpawnInterval/MaxOnBelt`,
-rarities, prices and so on. To give an influencer a real Roblox avatar, add it
+rarities, prices, floor costs (`EQUIPMENT.Floors`) and so on. To give an influencer a real Roblox avatar, add it
 to `Constants.INFLUENCER_AVATARS` (`["Joey Swool"] = <UserId>`). Equipment
 dimensions are in `Gym/StationSpecs.luau`. Both the map builder and the
 animations read them, so machines and bodies always line up.

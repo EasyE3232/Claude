@@ -63,8 +63,8 @@ local function onPlayerAdded(player)
 	local plot = PlotService.AssignPlot(player)
 
 	if plot then
-		local rackLevel = profile.Equipment.RackSlots or 1
-		local slots = Constants.EQUIPMENT.RackSlots.Values[rackLevel]
+		local floorLevel = profile.Equipment.Floors or 1
+		local slots = Constants.EQUIPMENT.Floors.Values[floorLevel] or Constants.EQUIPMENT.Floors.Values[1]
 		PlotService.RefreshSlots(plot.Id, slots)
 		PlotService.ApplyColor(plot.Id, profile.GymColor or 3)
 		local restored = InfluencerService.RestorePlaced(player, plot)
