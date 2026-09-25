@@ -18,9 +18,44 @@ and play-test with **Graphics Quality 8+**. Future lighting is enabled.
 | **3 of each machine (33 per gym)** | Groups of 3 side by side. F1: treadmills, spin bikes, dumbbell-curl stations, DB shoulder press. F2: lat pulldowns, cable rows, leg extensions, chin/dip assist. F3: squat racks, deadlift platforms, bench presses. |
 | **Big equipment** | Machines are built 1.25× real proportions (`StationSpecs.SCALE`), and influencers are scaled to match. |
 | **Rarer = heavier** | Rarity sets the load: bars carry 1 (Common) to 5 (Legendary) colored bumper plates per side, dumbbells grow extra plates, and more of each weight stack gets lifted. Heavier lifters do fewer, slower, grindier reps with visible bar shake, and rest longer. |
-| **Influencers** | Real R15 avatars (`CreateHumanoidModelFromDescriptionAsync`), dressed in their rarity color, bulkier at higher rarities, sparkles on Epic and Legendary. They ride the conveyor physically and do emotes (wave, cheer, dance). |
-| **Claiming** | Hold **E** on an influencer on the conveyor. If you have a free machine, it's reserved on the spot and the influencer **walks on its own straight to that machine in your gym** (pathfinding, stairs included) and starts training. Players move at **2× speed** (36). |
+| **Influencers** | **40 parody gym characters** across 7 rarities (see *Character system* below). Each is a real R15 rig with a custom look built from parts: skin, hair, beards, stringers/hoodies/oversized tees, posing trunks, props, and muscle shells sized per character (Tom's legs, Nick's mass, Halfthor's height). They ride the conveyor with an overhead tag (name, rarity, price, +income/s), and the posers hit double biceps, vacuums and lat spreads. |
+| **Buying** | Hold **E** on a character on the conveyor to **buy it for its price**. If you can afford it and have a free machine, the machine is reserved and the character **walks on its own straight to your gym** (pathfinding, stairs included) and starts earning its income every second. Players move at **2× speed** (36). |
 | **Stealing** | Lure a training influencer out of someone else's gym: it walks toward a free machine in YOUR gym. That gym's front desk worker (a real R15 NPC) runs after the influencer; if it catches them first, they walk back to their machine (and a thief standing nearby gets tackled). |
+
+## Character system
+
+Everything lives in **one file: `src/ReplicatedStorage/Modules/Characters.luau`**.
+No script hardcodes a price, income or rarity.
+
+* **`Characters.RARITIES`**: Common, Uncommon, Rare, Epic, Legendary, Mythic and
+  G.O.A.T. Each has its roll odds (70 / 22 / 6 / 1.6 / 0.32 / 0.075 / 0.005 %),
+  name color, conveyor glow, spawn and purchase sounds, particles, outline,
+  aura and how loud its spawn is (chat line, banner, or a full server event).
+* **`Characters.LIST`**: every character with `Name, DisplayName, Rarity, Price,
+  IncomePerSecond, SpawnWeight, ModelName, InspiredBy`, plus a `Look` (body
+  build, hair, clothes, props) and optional specials (`Glow`, `Chart`, `Poses`,
+  `SpawnFx`, `IdleSpeed`, `Emote`).
+* **Two-step roll**: pick a rarity by its odds, then a character inside it by
+  `SpawnWeight`. So Sam Sulik is about 3× rarer than Will Tennyson even though
+  both are Uncommon. `Characters.EffectiveOdds(name)` gives the real 1-in-N.
+* **Add a character**: add one entry to `LIST`. The conveyor, shop, tags, save
+  data and effects pick it up automatically.
+* **Big money**: cash is a double (good far past trillions, up to ~1e308) and
+  is shown abbreviated everywhere: `$3.5B/s`, `$2.4Qa`, and so on
+  (`Constants.FormatNumber`). The leaderboard shows the abbreviated string.
+* **Mutations (future)**: `Characters.MUTATIONS` and `Characters.GetIncome(name,
+  mutation)` are wired through spawning, saving and income. Gold, Diamond,
+  Radioactive, Galaxy and Secret are stubbed with multipliers, ready to switch on.
+* **Big spawns**: Legendary gets a strong sound, conveyor glow and a server
+  message. Mythic changes the conveyor color, shows a bigger banner and throws
+  particles. A **G.O.A.T.** turns the conveyor gold, flickers every gym's lights
+  and puts up a global banner with a gold aura. Ronnie drops in with a heavy
+  landing and camera shake, and Arnie shifts the world's lighting gold with
+  "A G.O.A.T. HAS ENTERED THE GYM."
+* **Sounds**: the sound ids in `RARITIES` are built-in Roblox sounds used as
+  placeholders. Swap them for your own audio ids.
+* All characters are **parody-inspired** Roblox versions: no real logos,
+  tattoos, branded clothing or merch.
 
 ## How the realistic motion works
 
@@ -55,9 +90,9 @@ Motion is procedural and runs on every client, with no uploaded animation assets
 ## Tuning
 
 Everything lives in `src/ReplicatedStorage/Modules/Constants.luau`:
-`NPC.FollowSpeed` (escort pace), `BELT.Speed/SpawnInterval/MaxOnBelt`,
-rarities, prices, floor costs (`EQUIPMENT.Floors`) and so on. To give an influencer a real Roblox avatar, add it
-to `Constants.INFLUENCER_AVATARS` (`["Joey Swool"] = <UserId>`). Equipment
+`NPC.TravelSpeed`, `BELT.Speed/SpawnInterval/MaxOnBelt`, `STARTING_CASH`,
+floor costs (`EQUIPMENT.Floors`) and so on. Characters, prices, income and
+rarities are in `Characters.luau` (above). Equipment
 dimensions are in `Gym/StationSpecs.luau`. Both the map builder and the
 animations read them, so machines and bodies always line up.
 

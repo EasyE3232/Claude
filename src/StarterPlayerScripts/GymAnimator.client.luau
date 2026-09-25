@@ -271,6 +271,84 @@ do
 end
 
 -- ----------------------------------------------------------------------
+-- Belt posing idles (characters with a Poses attribute strike a pose every
+-- few seconds while riding the conveyor, layered over their idle animation)
+-- ----------------------------------------------------------------------
+local POSE_PERIOD, POSE_HOLD = 9, 3.2
+local POSE_JOINTS = { "LeftShoulder", "LeftElbow", "LeftWrist", "RightShoulder", "RightElbow", "RightWrist", "Waist", "Neck" }
+local beltRigs = {}
+
+local function beltPose(model, now, camPos)
+	local hrp = model:FindFirstChild("HumanoidRootPart")
+	if not hrp or (hrp.Position - camPos).Magnitude > 170 then
+		return
+	end
+	local t = now + ((model:GetAttribute("Seed") or 1) % 97)
+	local cycle = math.floor(t / POSE_PERIOD)
+	local u = t - cycle * POSE_PERIOD
+	if u > POSE_HOLD then
+		return
+	end
+	local w = smooth(u / 0.45) * smooth((POSE_HOLD - u) / 0.45)
+	if w <= 0.001 then
+		return
+	end
+	local rig = beltRigs[model]
+	if rig == nil then
+		local ok, r = pcall(RigSolver.new, model)
+		rig = ok and r or false
+		beltRigs[model] = rig
+	end
+	if not rig then
+		return
+	end
+	local poses = string.split(model:GetAttribute("Poses"), ",")
+	local name = poses[(cycle % #poses) + 1]
+	local d = rig.Dims
+	local k = d.Scale
+
+	rig:reset()
+	rig:setRootCFrame(nil)
+	if name == "MostMuscular" then
+		rig:set("Waist", CFrame.Angles(math.rad(-14), 0, 0))
+	elseif name == "Vacuum" then
+		rig:set("Waist", CFrame.Angles(math.rad(5), 0, 0))
+	elseif name == "LatSpread" then
+		rig:set("Waist", CFrame.Angles(math.rad(3), 0, 0))
+	end
+	local ut = rig:world("UpperTorso")
+	local right, up, fwd = ut.RightVector, ut.UpVector, ut.LookVector
+	local head = rig:world("Head").Position
+	local lt = rig:world("LowerTorso")
+	for _, side in ipairs({ "Left", "Right" }) do
+		local sgn = side == "Left" and -1 or 1
+		local S = rig:pivot(side .. "Shoulder")
+		local target, pole
+		if name == "DoubleBiceps" then
+			target = S + right * sgn * (1.15 * k) + up * (1.05 * k) - fwd * (0.1 * k)
+			pole = S + right * sgn * (3 * k) - up * (0.4 * k)
+		elseif name == "Vacuum" then
+			target = head + right * sgn * (0.45 * k) - fwd * (0.55 * k) + up * (0.15 * k)
+			pole = S + right * sgn * (2.5 * k) + up * (1.6 * k)
+		elseif name == "MostMuscular" then
+			target = ut.Position + fwd * (0.95 * k) - up * (0.75 * k) + right * sgn * (0.25 * k)
+			pole = S + right * sgn * (2.6 * k) + fwd * (0.4 * k)
+		else -- LatSpread: fists on the waist, elbows flared
+			target = lt * Vector3.new(sgn * (d.ShoulderHalfWidth - 0.25 * k), 0.3 * k, 0.12 * k)
+			pole = S + right * sgn * (2.6 * k) - fwd * (1.1 * k)
+		end
+		rig:armIK(side, target, pole)
+	end
+	rig:set("Neck", CFrame.Angles(name == "MostMuscular" and math.rad(10) or 0, 0, 0))
+	for _, jn in ipairs(POSE_JOINTS) do
+		local j = rig.J[jn]
+		if j then
+			j.Inst.Transform = j.Inst.Transform:Lerp(rig.T[jn], w)
+		end
+	end
+end
+
+-- ----------------------------------------------------------------------
 -- Main loop (PreSimulation runs after the Animator, so our joint transforms win)
 -- ----------------------------------------------------------------------
 local promptAccum = 0
@@ -334,6 +412,9 @@ RunService.PreSimulation:Connect(function(dt)
 				if lt then
 					lastPelvis[model] = lt.CFrame
 				end
+				if state == "OnBelt" and model:GetAttribute("Poses") then
+					beltPose(model, now, camPos)
+				end
 			end
 		end
 	end
@@ -348,6 +429,7 @@ if influencers then
 		local a = active[model]
 		active[model] = nil
 		lastPelvis[model] = nil
+		beltRigs[model] = nil
 		if a and a.Ctx then
 			table.clear(bulkParts)
 			table.clear(bulkCFs)

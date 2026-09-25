@@ -2,11 +2,14 @@
 	BeltService
 	The shared conveyor down the middle of the map. The BeltTrack part is a real
 	physics conveyor (its AssemblyLinearVelocity carries anything standing on
-	it), so influencers ride it as physical characters and replicate smoothly.
-	Rarity-weighted influencers drop out of chutes spread along the belt (every
-	DropPoint part, taking turns in a shuffled order) so every gym gets
-	deliveries close to its door. Whoever nobody claims leaves at BeltEnd.
-	Claiming is InfluencerService's prompt.
+	it), so characters ride it as physical R15 models and replicate smoothly.
+
+	Every few seconds it rolls the next character from ReplicatedStorage.Modules
+	.Characters (rarity by Odds, then character by SpawnWeight) and drops it at
+	the tunnel. Rarity events (sounds, conveyor color, banners, G.O.A.T. server
+	events) are broadcast to clients through Remotes.CharacterFx; server-side
+	spectacle (spotlights, gold particles) is created here. Unsold characters
+	leave at BeltEnd.
 ]]
 
 local Players = game:GetService("Players")
@@ -15,10 +18,138 @@ local RS = game:GetService("ReplicatedStorage")
 local SSS = game:GetService("ServerScriptService")
 
 local Constants = require(RS.Modules.Constants)
+local Characters = require(RS.Modules.Characters)
 local InfluencerService = require(SSS.InfluencerService)
 local Notify = require(SSS.Notify)
 
 local BeltService = {}
+
+local FxRemote = RS:WaitForChild("Remotes"):WaitForChild("CharacterFx")
+
+-- A light that follows a character around for a few seconds (spawn spectacle).
+local function followSpotlight(model, color, duration)
+	local root = model:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return
+	end
+	local rig = Instance.new("Part")
+	rig.Name = "SpawnSpotlight"
+	rig.Anchored = true
+	rig.CanCollide = false
+	rig.CanQuery = false
+	rig.CanTouch = false
+	rig.Transparency = 1
+	rig.Size = Vector3.new(1, 1, 1)
+	rig.Parent = workspace
+	local spot = Instance.new("SpotLight")
+	spot.Face = Enum.NormalId.Bottom
+	spot.Angle = 38
+	spot.Range = 45
+	spot.Brightness = 10
+	spot.Color = color
+	spot.Shadows = true
+	spot.Parent = rig
+	local beam = Instance.new("Part")
+	beam.Name = "LightBeam"
+	beam.Anchored = true
+	beam.CanCollide = false
+	beam.CanQuery = false
+	beam.CanTouch = false
+	beam.Material = Enum.Material.Neon
+	beam.Color = color
+	beam.Transparency = 0.82
+	beam.Shape = Enum.PartType.Cylinder
+	beam.Size = Vector3.new(30, 7, 7)
+	beam.CastShadow = false
+	beam.Parent = workspace
+	local t0 = os.clock()
+	local conn
+	conn = RunService.Heartbeat:Connect(function()
+		local alive = root.Parent and os.clock() - t0 < duration
+		if not alive then
+			conn:Disconnect()
+			rig:Destroy()
+			beam:Destroy()
+			return
+		end
+		local p = root.Position
+		rig.CFrame = CFrame.new(p + Vector3.new(0, 30, 0))
+		beam.CFrame = CFrame.new(p + Vector3.new(0, 15, 0)) * CFrame.Angles(0, 0, math.rad(90))
+		local fade = math.clamp((duration - (os.clock() - t0)) / 1.5, 0, 1)
+		beam.Transparency = 1 - 0.18 * fade
+		spot.Brightness = 10 * fade
+	end)
+end
+
+local function goldBurst(model, duration)
+	local root = model:FindFirstChild("HumanoidRootPart")
+	if not root then
+		return
+	end
+	local att = Instance.new("Attachment")
+	att.Parent = root
+	local pe = Instance.new("ParticleEmitter")
+	pe.Color = ColorSequence.new(Color3.fromRGB(255, 236, 140), Color3.fromRGB(255, 180, 20))
+	pe.LightEmission = 1
+	pe.Rate = 80
+	pe.Lifetime = NumberRange.new(1.2, 2.2)
+	pe.Speed = NumberRange.new(4, 10)
+	pe.SpreadAngle = Vector2.new(180, 180)
+	pe.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+	pe.Acceleration = Vector3.new(0, 3, 0)
+	pe.Parent = att
+	task.delay(duration, function()
+		pe.Enabled = false
+		task.delay(3, function()
+			att:Destroy()
+		end)
+	end)
+end
+
+local function announce(char, rarity, model)
+	local fx = char.SpawnFx
+	if fx == "GoldSpotlight" then
+		followSpotlight(model, Color3.fromRGB(255, 205, 70), 9)
+	elseif fx == "Cinematic" then
+		followSpotlight(model, Color3.fromRGB(235, 240, 255), 6)
+	elseif fx == "GoldenEra" then
+		followSpotlight(model, Color3.fromRGB(255, 215, 90), 10)
+		goldBurst(model, 8)
+	elseif rarity.Index >= 7 then
+		goldBurst(model, 5)
+	end
+
+	FxRemote:FireAllClients("Spawn", {
+		Model = model,
+		Id = char.Name,
+		Name = char.DisplayName,
+		Rarity = char.Rarity,
+		SpawnFx = fx,
+	})
+
+	if rarity.Announce then
+		local text
+		if rarity.Index >= 7 then
+			text = "A G.O.A.T. HAS ENTERED THE GYM: " .. char.DisplayName:upper() .. "!"
+		elseif rarity.Index >= 6 then
+			text = "MYTHIC " .. char.DisplayName:upper() .. " just walked onto the conveyor!"
+		else
+			text = rarity.DisplayName .. " " .. char.DisplayName .. " just hit the red carpet!"
+		end
+		for _, player in ipairs(Players:GetPlayers()) do
+			Notify(player, text, "info")
+		end
+	end
+end
+
+function BeltService.OnPurchased(rec, buyer)
+	FxRemote:FireAllClients("Purchase", {
+		Model = rec.Model,
+		Id = rec.Id,
+		Rarity = rec.Char.Rarity,
+		Buyer = buyer,
+	})
+end
 
 local rng = Random.new()
 local spawnTimer = 0
@@ -58,6 +189,7 @@ function BeltService.Init()
 		table.insert(dropPoints, startPart)
 	end
 	track:SetAttribute("Speed", Constants.BELT.Speed)
+	InfluencerService.OnPurchased = BeltService.OnPurchased
 	workspace:SetAttribute("BeltSpeed", Constants.BELT.Speed)
 
 	RunService.Heartbeat:Connect(function(dt)
@@ -93,18 +225,18 @@ function BeltService.Step(dt)
 	if spawnTimer >= cfg.SpawnInterval then
 		spawnTimer = 0
 		if InfluencerService.CountOnBelt() < cfg.MaxOnBelt then
-			local rarityIdx = Constants.RollRarity(rng)
+			local char = Characters.Roll(rng)
+			local rarity = Characters.GetRarity(char.Rarity)
 			local drop = nextDropPoint()
-			local spawnCF = CFrame.new(drop.Position + Vector3.new(rng:NextNumber(-0.8, 0.8), 0, 0))
+			local pos = drop.Position + Vector3.new(rng:NextNumber(-0.8, 0.8), 0, 0)
+			if char.SpawnFx == "HeavyLanding" then
+				pos += Vector3.new(0, 22, 14) -- drops from high up (clear of the tunnel roof) and slams onto the belt
+			end
 			-- avatar creation can yield (asset loading), so don't block Heartbeat
 			task.spawn(function()
-				local rec = InfluencerService.Spawn(rarityIdx, spawnCF)
-				if rarityIdx >= 4 then
-					-- Epic / Legendary: let the whole server know
-					local rarity = Constants.RARITIES[rarityIdx]
-					for _, player in ipairs(Players:GetPlayers()) do
-						Notify(player, rarity.Name:upper() .. " " .. rec.Name .. " just hit the red carpet!", "info")
-					end
+				local rec = InfluencerService.Spawn(char, CFrame.new(pos))
+				if rec and rec.Model then
+					announce(char, rarity, rec.Model)
 				end
 			end)
 		end

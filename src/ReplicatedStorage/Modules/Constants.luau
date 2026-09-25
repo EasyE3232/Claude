@@ -62,46 +62,10 @@ Constants.SKIN_TONES = {
 }
 
 -- ======================================================================
--- RARITIES  (Common -> Legendary). Income is Cash per second while placed.
--- Names are parody gym-bro archetypes. Rename freely.
+-- CHARACTERS: every collectible (price, income, rarity, odds, look) lives in
+-- ReplicatedStorage.Modules.Characters. Nothing character-related is here.
 -- ======================================================================
-Constants.RARITIES = {
-	{
-		Name = "Common",
-		Weight = 60,
-		Income = 1,
-		Color = Color3.fromRGB(154, 163, 176),
-		Names = { "Edgar", "Tank Top Tyler", "Leg Day Larry", "One Set Sam" },
-	},
-	{
-		Name = "Uncommon",
-		Weight = 25,
-		Income = 3,
-		Color = Color3.fromRGB(79, 209, 124),
-		Names = { "Preworkout Pete", "Bulk Season Brody", "Cardio Carl" },
-	},
-	{
-		Name = "Rare",
-		Weight = 10,
-		Income = 10,
-		Color = Color3.fromRGB(79, 157, 251),
-		Names = { "Shredded Shane", "Deadlift Dante", "Protein Paul" },
-	},
-	{
-		Name = "Epic",
-		Weight = 4,
-		Income = 30,
-		Color = Color3.fromRGB(176, 107, 240),
-		Names = { "The Pump God", "Macro Mike" },
-	},
-	{
-		Name = "Legendary",
-		Weight = 1,
-		Income = 120,
-		Color = Color3.fromRGB(244, 201, 58),
-		Names = { "Joey Swool" },
-	},
-}
+Constants.STARTING_CASH = 100 -- enough to buy your first Common off the conveyor
 
 -- ======================================================================
 -- WORKOUT (personal Strength — permanent, never reset)
@@ -245,49 +209,37 @@ function Constants.GetBooster(id)
 	return nil
 end
 
-function Constants.GetRarity(index)
-	return Constants.RARITIES[index]
-end
-
--- Weighted random rarity index
-function Constants.RollRarity(rng)
-	local total = 0
-	for _, r in ipairs(Constants.RARITIES) do
-		total += r.Weight
-	end
-	local roll = (rng and rng:NextNumber(0, total)) or (math.random() * total)
-	local acc = 0
-	for i, r in ipairs(Constants.RARITIES) do
-		acc += r.Weight
-		if roll <= acc then
-			return i
-		end
-	end
-	return 1
-end
-
+-- Short money/number format: 950, 1.4K, 7.5M, 3.5B, 12T, 4.2Qa ... (works far past trillions)
+local SUFFIXES = { "", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc", "Ud", "Dd", "Td", "Qad", "Qid" }
 function Constants.FormatNumber(n)
-	n = math.floor(n)
-	if n >= 1e12 then
-		return string.format("%.2fT", n / 1e12)
-	elseif n >= 1e9 then
-		return string.format("%.2fB", n / 1e9)
-	elseif n >= 1e6 then
-		return string.format("%.2fM", n / 1e6)
-	elseif n >= 1e4 then
-		return string.format("%.1fK", n / 1e3)
+	n = tonumber(n) or 0
+	if n ~= n then
+		return "0"
 	end
-	local s = tostring(n)
-	local out = ""
-	local count = 0
-	for i = #s, 1, -1 do
-		out = s:sub(i, i) .. out
-		count += 1
-		if count % 3 == 0 and i > 1 then
-			out = "," .. out
+	local sign = n < 0 and "-" or ""
+	n = math.abs(n)
+	if n < 1000 then
+		if n == math.floor(n) or n >= 100 then
+			return sign .. tostring(math.floor(n))
 		end
+		return sign .. (string.format("%.1f", n):gsub("%.0$", ""))
 	end
-	return out
+	local tier = math.min(math.floor(math.log10(n) / 3), #SUFFIXES - 1)
+	local scaled = n / 10 ^ (tier * 3)
+	if scaled >= 999.995 and tier < #SUFFIXES - 1 then
+		tier += 1
+		scaled = n / 10 ^ (tier * 3)
+	end
+	local text
+	if scaled >= 100 then
+		text = string.format("%.0f", scaled)
+	elseif scaled >= 10 then
+		text = string.format("%.1f", scaled)
+	else
+		text = string.format("%.2f", scaled)
+	end
+	text = text:gsub("(%..-)0+$", "%1"):gsub("%.$", "")
+	return sign .. text .. SUFFIXES[tier + 1]
 end
 
 return Constants

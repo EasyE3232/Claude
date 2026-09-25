@@ -289,6 +289,7 @@ local function updateLocomotion(set, hrp, dt)
 	idle:AdjustWeight(math.max(set.Weights[1], 0.001), 0.1)
 	walk:AdjustWeight(math.max(set.Weights[2], 0.001), 0.1)
 	run:AdjustWeight(math.max(set.Weights[3], 0.001), 0.1)
+	idle:AdjustSpeed(set.Humanoid.Parent and set.Humanoid.Parent:GetAttribute("IdleSpeed") or 1)
 	walk:AdjustSpeed(math.max(warp, 0.1))
 	run:AdjustSpeed(math.max(warp, 0.1))
 end

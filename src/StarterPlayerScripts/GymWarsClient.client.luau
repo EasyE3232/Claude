@@ -375,6 +375,9 @@ end
 local refreshShop -- forward declare
 
 local function stat(name)
+	if name == "Cash" then
+		return player:GetAttribute("Cash") or 0 -- exact value (leaderboard shows the short text)
+	end
 	local ls = player:FindFirstChild("leaderstats")
 	local v = ls and ls:FindFirstChild(name)
 	return v and v.Value or 0
@@ -713,7 +716,7 @@ local function refreshHUD()
 	rackLabel.Text = string.format("Machines: %d/%d", player:GetAttribute("RackUsed") or 0, player:GetAttribute("RackSlots") or 0)
 
 	local carrying = player:GetAttribute("Carrying")
-	carryBanner.Text = (carrying and carrying ~= "") and (carrying:upper() .. " IS FOLLOWING YOU — LEAD THEM TO YOUR GYM!  [X] to let go") or ""
+	carryBanner.Text = (carrying and carrying ~= "") and (carrying:upper() .. " IS HEADING TO YOUR GYM!") or ""
 	stunBanner.Text = player:GetAttribute("Stunned") and "KNOCKED DOWN!" or ""
 end
 
@@ -734,7 +737,7 @@ end
 -- leaderstats
 task.spawn(function()
 	local ls = player:WaitForChild("leaderstats")
-	for _, name in ipairs({ "Cash", "Strength", "Rebirths" }) do
+	for _, name in ipairs({ "Strength", "Rebirths" }) do
 		local v = ls:WaitForChild(name)
 		v.Changed:Connect(refreshHUD)
 	end

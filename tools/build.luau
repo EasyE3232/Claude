@@ -181,6 +181,7 @@ for name, class in pairs({
 	Rebirth = "RemoteFunction",
 	SetGymColor = "RemoteEvent",
 	DismissFollower = "RemoteEvent",
+	CharacterFx = "RemoteEvent",
 }) do
 	if not remotes:FindFirstChild(name) then
 		local r = Instance.new(class)

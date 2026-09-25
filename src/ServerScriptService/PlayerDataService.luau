@@ -33,14 +33,14 @@ end
 
 local function defaultProfile()
 	return {
-		Cash = 0,
+		Cash = Constants.STARTING_CASH,
 		Strength = 0,
 		Rebirths = 0,
 		OwnedClothing = {}, -- [clothingId] = true
 		Equipped = {}, -- [slotName] = clothingId
 		Equipment = { Floors = 1, WorkoutGain = 1, DeskSpeed = 1 },
 		GymColor = 3,
-		Placed = {}, -- list of { Rarity = index, Name = string, Slot = number, Seed = number }
+		Placed = {}, -- list of { Id = character id, Slot = number, Seed = number, Mutation = id|nil }
 	}
 end
 
@@ -85,9 +85,11 @@ function PlayerDataService.SyncLeaderstats(player)
 	local cash = ls:FindFirstChild("Cash")
 	local strength = ls:FindFirstChild("Strength")
 	local rebirths = ls:FindFirstChild("Rebirths")
+	-- the leaderboard shows the short form ($3.5T); the exact number lives in the "Cash" attribute
 	if cash then
-		cash.Value = math.floor(profile.Cash)
+		cash.Value = "$" .. Constants.FormatNumber(profile.Cash)
 	end
+	player:SetAttribute("Cash", profile.Cash)
 	if strength then
 		strength.Value = math.floor(profile.Strength)
 	end
@@ -124,12 +126,16 @@ function PlayerDataService.LoadPlayer(player)
 	end
 
 	local profile = mergeDefaults(data)
+	-- broke with an empty gym (new player or old save): enough for a first Common
+	if (tonumber(profile.Cash) or 0) < Constants.STARTING_CASH and #profile.Placed == 0 then
+		profile.Cash = Constants.STARTING_CASH
+	end
 	cache[player.UserId] = profile
 
 	local leaderstats = Instance.new("Folder")
 	leaderstats.Name = "leaderstats"
 
-	local cash = Instance.new("NumberValue")
+	local cash = Instance.new("StringValue")
 	cash.Name = "Cash"
 	cash.Parent = leaderstats
 

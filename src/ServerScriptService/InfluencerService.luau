@@ -25,7 +25,8 @@ local Constants = require(RS.Modules.Constants)
 local PlayerDataService = require(SSS.PlayerDataService)
 local PlotService = require(SSS.PlotService)
 local NpcService = require(SSS.NpcService)
-local StationSpecs = require(RS.Modules.Gym.StationSpecs)
+local Characters = require(RS.Modules.Characters)
+local CharacterLooks = require(SSS.CharacterLooks)
 local Notify = require(SSS.Notify)
 
 local InfluencerService = {}
@@ -33,6 +34,8 @@ local InfluencerService = {}
 -- Callbacks set by DefenseService
 InfluencerService.OnTheftStarted = nil -- function(rec, thiefPlayer, victimPlot)
 InfluencerService.OnTheftEnded = nil -- function(rec, victimPlot)
+-- Set by BeltService (purchase effects)
+InfluencerService.OnPurchased = nil -- function(rec, buyer)
 
 local records = {} -- [model] = rec
 local rackFullDebounce = {} -- [userId] = os.clock()
@@ -42,72 +45,16 @@ local rng = Random.new()
 -- ----------------------------------------------------------------------
 -- Model construction
 -- ----------------------------------------------------------------------
-local function looksFor(rec)
-	local r = Random.new(rec.Seed)
-	local rarity = Constants.RARITIES[rec.Rarity]
-	local tier = rec.Rarity - 1
-	return {
-		Name = rec.Name,
-		Skin = Constants.SKIN_TONES[r:NextInteger(1, #Constants.SKIN_TONES)],
-		Shirt = rarity.Color,
-		Pants = Color3.fromRGB(28 + r:NextInteger(0, 20), 30 + r:NextInteger(0, 20), 38 + r:NextInteger(0, 24)),
-		Height = 1 + r:NextNumber(0, 0.06) + tier * 0.01,
-		Width = 1 + r:NextNumber(0, 0.06) + tier * 0.05,
-		Depth = 1 + r:NextNumber(0, 0.05) + tier * 0.04,
-		AvatarUserId = Constants.INFLUENCER_AVATARS[rec.Name],
-		Scale = StationSpecs.SCALE,
-	}
-end
-
 local function buildModel(rec)
-	local rarity = Constants.RARITIES[rec.Rarity]
-	local model = NpcService.CreateRig(looksFor(rec))
+	local model = CharacterLooks.Build(rec.Char)
 	local root = model:FindFirstChild("HumanoidRootPart")
-	local head = model:FindFirstChild("Head") or root
-
-	local tag = Instance.new("BillboardGui")
-	tag.Name = "NameTag"
-	tag.Size = UDim2.new(0, 170, 0, 46)
-	tag.StudsOffsetWorldSpace = Vector3.new(0, 2.2, 0)
-	tag.AlwaysOnTop = true
-	tag.MaxDistance = 90
-	tag.LightInfluence = 0
-	tag.Parent = head
-
-	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Name = "NameLabel"
-	nameLabel.Size = UDim2.new(1, 0, 0.6, 0)
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.Font = Enum.Font.GothamBlack
-	nameLabel.TextScaled = true
-	nameLabel.TextColor3 = Color3.new(1, 1, 1)
-	nameLabel.TextStrokeTransparency = 0.3
-	nameLabel.Text = rec.Name
-	nameLabel.Parent = tag
-
-	local rarityLabel = Instance.new("TextLabel")
-	rarityLabel.Name = "RarityLabel"
-	rarityLabel.Size = UDim2.new(1, 0, 0.4, 0)
-	rarityLabel.Position = UDim2.new(0, 0, 0.6, 0)
-	rarityLabel.BackgroundTransparency = 1
-	rarityLabel.Font = Enum.Font.GothamBold
-	rarityLabel.TextScaled = true
-	rarityLabel.TextColor3 = rarity.Color
-	rarityLabel.TextStrokeTransparency = 0.3
-	rarityLabel.Text = rarity.Name .. "  +$" .. Constants.FormatNumber(rec.Income) .. "/s"
-	rarityLabel.Parent = tag
-
-	if rec.Rarity >= 4 then
-		local sparkle = Instance.new("Sparkles")
-		sparkle.SparkleColor = rarity.Color
-		sparkle.Parent = root
-	end
+	local _, priceLabel, incomeLabel = CharacterLooks.BuildTag(model, rec.Char, rec.RarityDef, rec.Income)
 
 	local prompt = Instance.new("ProximityPrompt")
 	prompt.Name = "GrabPrompt"
-	prompt.ActionText = "Claim"
+	prompt.ActionText = "Buy $" .. Constants.FormatNumber(rec.Price)
 	prompt.ObjectText = rec.Name
-	prompt.HoldDuration = Constants.BELT.ClaimHold
+	prompt.HoldDuration = rec.RarityDef.Index >= 5 and 0.6 or Constants.BELT.ClaimHold
 	prompt.MaxActivationDistance = Constants.BELT.ClaimDistance
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = root
@@ -116,9 +63,10 @@ local function buildModel(rec)
 	stationRef.Name = "Station"
 	stationRef.Parent = model
 
-	model:SetAttribute("Rarity", rec.Rarity)
 	model:SetAttribute("Income", rec.Income)
+	model:SetAttribute("Price", rec.Price)
 	model:SetAttribute("Seed", rec.Seed)
+	model:SetAttribute("Mutation", rec.Mutation or "None")
 	model:SetAttribute("State", rec.State)
 	model:SetAttribute("OwnerUserId", 0)
 
@@ -126,6 +74,8 @@ local function buildModel(rec)
 	rec.Root = root
 	rec.Humanoid = model:FindFirstChildOfClass("Humanoid")
 	rec.Prompt = prompt
+	rec.PriceLabel = priceLabel
+	rec.IncomeLabel = incomeLabel
 	rec.StationRef = stationRef
 	records[model] = rec
 
@@ -139,10 +89,15 @@ local function setState(rec, state)
 	rec.State = state
 	if rec.Model then
 		rec.Model:SetAttribute("State", state)
+		local forSale = state == "OnBelt" or state == "Dropped"
 		if rec.Prompt then
-			rec.Prompt.Enabled = state == "OnBelt" or state == "Dropped" or state == "Placed"
-			rec.Prompt.ActionText = state == "Placed" and "Steal" or "Claim"
+			rec.Prompt.Enabled = forSale or state == "Placed"
+			rec.Prompt.ActionText = state == "Placed" and "Steal" or ("Buy $" .. Constants.FormatNumber(rec.Price))
 		end
+		if rec.PriceLabel then
+			rec.PriceLabel.Visible = forSale
+		end
+		CharacterLooks.SetPropsVisible(rec.Model, state ~= "Placed")
 	end
 end
 
@@ -179,7 +134,7 @@ local function addToProfile(player, rec)
 		return
 	end
 	removeFromProfile(player, rec.Slot)
-	table.insert(profile.Placed, { Rarity = rec.Rarity, Name = rec.Name, Slot = rec.Slot, Seed = rec.Seed })
+	table.insert(profile.Placed, { Id = rec.Id, Slot = rec.Slot, Seed = rec.Seed, Mutation = rec.Mutation })
 end
 
 local function refreshRackAttr(plot)
@@ -311,20 +266,25 @@ function InfluencerService.Init()
 	end)
 end
 
-local function newRecord(rarityIdx, name, seed, state)
-	local rarity = Constants.RARITIES[rarityIdx] or Constants.RARITIES[1]
+local function newRecord(char, seed, state, mutation)
+	local rarity = Characters.GetRarity(char.Rarity)
 	return {
-		Rarity = rarityIdx,
-		Name = name or rarity.Names[rng:NextInteger(1, #rarity.Names)],
-		Income = rarity.Income,
+		Char = char,
+		Id = char.Name,
+		Name = char.DisplayName,
+		RarityDef = rarity,
+		Rarity = rarity.Index,
+		Price = char.Price,
+		Mutation = mutation,
+		Income = Characters.GetIncome(char.Name, mutation),
 		Seed = seed or rng:NextInteger(1, 2 ^ 30),
 		State = state,
 	}
 end
 
--- Spawn a new influencer on the belt at `spawnCF` (facing sideways, toward the gyms).
-function InfluencerService.Spawn(rarityIdx, spawnCF)
-	local rec = newRecord(rarityIdx, nil, nil, "OnBelt")
+-- Spawn a character on the belt at `spawnCF` (facing sideways, toward the gyms).
+function InfluencerService.Spawn(char, spawnCF)
+	local rec = newRecord(char, nil, "OnBelt")
 	local model = buildModel(rec)
 	setState(rec, "OnBelt")
 	local side = rng:NextNumber() < 0.5 and 1 or -1
@@ -417,6 +377,16 @@ function InfluencerService.OnGrab(player, rec)
 			fullNotice(player)
 			return
 		end
+		-- BUY
+		local profile = PlayerDataService.GetProfile(uid)
+		if not profile or profile.Cash < rec.Price then
+			Notify(player, "You need $" .. Constants.FormatNumber(rec.Price) .. " to buy " .. rec.Name .. ".", "fail")
+			return
+		end
+		PlayerDataService.AddCash(player, -rec.Price)
+		if InfluencerService.OnPurchased then
+			InfluencerService.OnPurchased(rec, player)
+		end
 		local wasOnBelt = rec.State == "OnBelt"
 		rec.CarrierUserId = uid
 		sendToOwnMachine(rec, myPlot, slot, Constants.NPC.TravelSpeed)
@@ -424,7 +394,7 @@ function InfluencerService.OnGrab(player, rec)
 			hopOffBelt(rec)
 		end
 		local station = PlotService.GetStation(myPlot.Id, slot)
-		Notify(player, rec.Name .. " is heading to your " .. (station and PlotService.StationName(station) or "gym") .. "! +$" .. Constants.FormatNumber(rec.Income) .. "/s", "success")
+		Notify(player, "Bought " .. rec.Name .. " for $" .. Constants.FormatNumber(rec.Price) .. "! Heading to your " .. (station and PlotService.StationName(station) or "gym") .. " (+$" .. Constants.FormatNumber(rec.Income) .. "/s)", "success")
 		return
 	end
 
@@ -583,9 +553,16 @@ function InfluencerService.RestorePlaced(player, plot)
 	local restored = 0
 	for _, entry in ipairs(profile.Placed) do
 		local slot = entry.Slot
-		if slot and slot <= plot.Unlocked and not plot.Slots[slot] and Constants.RARITIES[entry.Rarity] then
-			local rec = newRecord(entry.Rarity, entry.Name or Constants.RARITIES[entry.Rarity].Names[1], entry.Seed, "Placed")
+		-- saves store the character id; very old saves stored a rarity index + name
+		local char = entry.Id and Characters.Get(entry.Id)
+		if not char and entry.Rarity then
+			char = Characters.DefaultForRarityIndex(entry.Rarity)
+			entry.Id = char and char.Name
+		end
+		if slot and slot <= plot.Unlocked and not plot.Slots[slot] and char then
+			local rec = newRecord(char, entry.Seed, "Placed", entry.Mutation)
 			entry.Seed = rec.Seed
+			entry.Rarity, entry.Name = nil, nil
 			local model = buildModel(rec)
 			model.Parent = folder
 			sitOnStation(rec, plot, slot, rng:NextNumber(0, 30))
@@ -623,8 +600,10 @@ function InfluencerService.Update(dt)
 	if emoteAccum >= 1 then
 		emoteAccum = 0
 		for _, rec in pairs(records) do
-			if rec.State == "OnBelt" and rng:NextNumber() < Constants.NPC.EmoteChance then
-				NpcService.PlayEmote(rec.Model, NpcService.EMOTES[rng:NextInteger(1, #NpcService.EMOTES)])
+			if rec.State == "OnBelt" and rng:NextNumber() < Constants.NPC.EmoteChance and not rec.Char.Poses then
+				local fav = rec.Char.Emote
+				local emote = (fav and rng:NextNumber() < 0.7) and fav or NpcService.EMOTES[rng:NextInteger(1, #NpcService.EMOTES)]
+				NpcService.PlayEmote(rec.Model, emote)
 			end
 		end
 	end
