@@ -3,17 +3,17 @@
 	Owns every influencer NPC (a real R15 character) and its lifecycle:
 
 	  OnBelt    -> standing on the conveyor, riding it (claimable by anyone)
-	  Following -> walking behind the player who claimed them, slower than the
-	               player (Constants.NPC.FollowSpeed), pathfinding around walls
-	  Seating   -> inside the owner's gym, walking to their machine
+	  Seating   -> claimed: walking on their own, straight to a machine in the
+	               claimer's gym (the machine is reserved the moment they're claimed)
 	  Placed    -> training on a machine (anchored; clients animate the workout),
 	               earning Cash for the plot owner
-	  Returning -> walking back to their machine after the front desk caught a thief
-	  Dropped   -> standing around unowned (leader died/left), claimable, leaves later
+	  Stolen    -> lured out of someone else's gym, walking to a machine in the
+	               thief's gym; the victim's front desk worker chases them
+	  Returning -> walking back to their machine after the front desk caught them
+	  Dropped   -> standing around unowned (knocked off the belt), claimable, leaves later
 
-	Stealing: grabbing a Placed influencer in someone else's gym makes it follow
-	the thief with OriginPlotId/OriginSlot remembered. If the thief is caught it
-	walks back to its machine; if it reaches the thief's gym it becomes theirs.
+	Stealing keeps OriginPlotId/OriginSlot reserved so a caught influencer can
+	walk back; if they reach the thief's machine first, they're the thief's.
 ]]
 
 local Players = game:GetService("Players")
@@ -35,7 +35,6 @@ InfluencerService.OnTheftStarted = nil -- function(rec, thiefPlayer, victimPlot)
 InfluencerService.OnTheftEnded = nil -- function(rec, victimPlot)
 
 local records = {} -- [model] = rec
-local carriedBy = {} -- [userId] = rec  (the influencer following that player)
 local rackFullDebounce = {} -- [userId] = os.clock()
 local folder = nil
 local rng = Random.new()
@@ -192,16 +191,8 @@ local function refreshRackAttr(plot)
 end
 
 -- ----------------------------------------------------------------------
--- Following (the old "carry")
+-- Getting to a machine
 -- ----------------------------------------------------------------------
-local function setWalkSpeed(player, speed)
-	local character = player and player.Character
-	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-	if humanoid and not player:GetAttribute("Stunned") then
-		humanoid.WalkSpeed = speed
-	end
-end
-
 local function hopOffBelt(rec)
 	-- step off the conveyor rails with a little hop
 	if rec.Humanoid then
@@ -218,45 +209,10 @@ local function standUp(rec)
 	if look.Magnitude < 0.1 then
 		look = Vector3.new(0, 0, -1)
 	end
-	rec.Model:PivotTo(CFrame.lookAt(pos + Vector3.new(0, 3.2, 0), pos + Vector3.new(0, 3.2, 0) + look.Unit))
+	rec.Model:PivotTo(CFrame.lookAt(pos + Vector3.new(0, 4, 0), pos + Vector3.new(0, 4, 0) + look.Unit))
 	setAnchored(rec, false)
 	NpcService.SetAnimationsEnabled(rec.Model, true)
 	rec.StationRef.Value = nil
-end
-
-local function startFollow(player, rec)
-	local wasOnBelt = rec.State == "OnBelt"
-	if rec.Root.Anchored then
-		standUp(rec)
-	end
-	setWalkSpeed(player, Constants.CARRY_WALKSPEED)
-	setState(rec, "Following")
-	rec.CarrierUserId = player.UserId
-	rec.Model:SetAttribute("OwnerUserId", player.UserId)
-	carriedBy[player.UserId] = rec
-	player:SetAttribute("Carrying", rec.Name)
-	NpcService.Follow(rec.Model, player, Constants.NPC.FollowSpeed, 0)
-	if wasOnBelt then
-		hopOffBelt(rec)
-	end
-end
-
-local function endFollow(rec)
-	local uid = rec.CarrierUserId
-	if uid then
-		if carriedBy[uid] == rec then
-			carriedBy[uid] = nil
-		end
-		local player = Players:GetPlayerByUserId(uid)
-		if player then
-			player:SetAttribute("Carrying", "")
-			setWalkSpeed(player, Constants.NORMAL_WALKSPEED)
-		end
-	end
-	rec.CarrierUserId = nil
-	if rec.Model then
-		NpcService.Stop(rec.Model)
-	end
 end
 
 -- Anchor the NPC on its machine; clients take over and animate the workout.
@@ -265,6 +221,7 @@ local function sitOnStation(rec, plot, slot, timeOffset)
 	setState(rec, "Placed")
 	rec.PlotId = plot.Id
 	rec.Slot = slot
+	rec.Arrive = nil
 	plot.Slots[slot] = rec
 	NpcService.Stop(rec.Model)
 	NpcService.SetAnimationsEnabled(rec.Model, false)
@@ -280,34 +237,55 @@ local function sitOnStation(rec, plot, slot, timeOffset)
 	refreshRackAttr(plot)
 end
 
--- Walk to the machine's approach point, then hop on.
-local function walkToStation(rec, plot, slot, speed, state)
+-- Walk (on their own) to a machine's approach point; `onArrive` runs when
+-- they get there, or after the timeout if they got stuck (they then just hop on).
+local function walkTo(rec, plot, slot, speed, onArrive)
 	local station = PlotService.GetStation(plot.Id, slot)
-	setState(rec, state or "Seating")
-	rec.PlotId = plot.Id
-	rec.Slot = slot
-	plot.Slots[slot] = rec -- reserve the slot right away
-	rec.Model:SetAttribute("OwnerUserId", plot.OwnerUserId)
-	refreshRackAttr(plot)
 	local approach = station and station:FindFirstChild("Approach")
-	if not approach then
-		sitOnStation(rec, plot, slot)
-		return
-	end
 	local token = {}
 	rec.SeatToken = token
 	local function arrive()
-		if rec.SeatToken == token and rec.Model and plot.Slots[slot] == rec then
-			sitOnStation(rec, plot, slot)
+		if rec.SeatToken == token and rec.Model then
+			rec.SeatToken = nil
+			onArrive()
 		end
 	end
-	NpcService.WalkTo(rec.Model, approach.Position, speed or Constants.NPC.SeatSpeed, arrive, Constants.NPC.SeatTimeout, arrive)
+	rec.Arrive = arrive
+	if rec.Root.Anchored then
+		standUp(rec)
+	end
+	if not approach then
+		task.defer(arrive)
+		return
+	end
+	NpcService.WalkTo(rec.Model, approach.Position, speed, arrive, Constants.NPC.SeatTimeout, arrive)
+end
+
+-- Reserve `slot` in `plot` for rec and send them there.
+local function sendToOwnMachine(rec, plot, slot, speed, state)
+	setState(rec, state or "Seating")
+	rec.PlotId = plot.Id
+	rec.Slot = slot
+	plot.Slots[slot] = rec -- reserved right away
+	rec.Model:SetAttribute("OwnerUserId", plot.OwnerUserId)
+	refreshRackAttr(plot)
+	walkTo(rec, plot, slot, speed, function()
+		if plot.Slots[slot] == rec then
+			sitOnStation(rec, plot, slot)
+			local owner = PlotService.GetOwnerPlayer(plot)
+			if owner and state ~= "Returning" then
+				addToProfile(owner, rec)
+			end
+		end
+	end)
 end
 
 local function dropHere(rec)
 	setState(rec, "Dropped")
 	rec.PlotId = nil
 	rec.Slot = nil
+	rec.SeatToken = nil
+	rec.Arrive = nil
 	rec.DroppedAt = os.clock()
 	rec.Model:SetAttribute("OwnerUserId", 0)
 	if rec.Root.Anchored then
@@ -361,9 +339,7 @@ function InfluencerService.Destroy(rec)
 	if not rec or not rec.Model then
 		return
 	end
-	if rec.CarrierUserId then
-		endFollow(rec)
-	end
+	rec.SeatToken = nil
 	if rec.PlotId and rec.Slot then
 		local plot = PlotService.GetPlotById(rec.PlotId)
 		if plot and plot.Slots[rec.Slot] == rec then
@@ -407,6 +383,14 @@ end
 -- ----------------------------------------------------------------------
 -- Public: grabbing (claim or steal)
 -- ----------------------------------------------------------------------
+local function fullNotice(player)
+	local now = os.clock()
+	if not rackFullDebounce[player.UserId] or now - rackFullDebounce[player.UserId] > 2 then
+		rackFullDebounce[player.UserId] = now
+		Notify(player, "Every machine on your open floors is taken! Buy another Gym Floor in the Shop.", "fail")
+	end
+end
+
 function InfluencerService.OnGrab(player, rec)
 	if not rec.Model then
 		return
@@ -418,21 +402,29 @@ function InfluencerService.OnGrab(player, rec)
 	-- server-side range check (prompts are client-evaluated)
 	local char = player.Character
 	local hrp = char and char:FindFirstChild("HumanoidRootPart")
-	if not hrp or (hrp.Position - rec.Root.Position).Magnitude > Constants.BELT.ClaimDistance + 6 then
+	if not hrp or (hrp.Position - rec.Root.Position).Magnitude > Constants.BELT.ClaimDistance + 8 then
 		return
 	end
-	if not PlotService.GetPlotByOwner(uid) then
+	local myPlot = PlotService.GetPlotByOwner(uid)
+	if not myPlot then
 		Notify(player, "All gyms are taken — you need a gym to hold influencers.", "fail")
 		return
 	end
 
 	if rec.State == "OnBelt" or rec.State == "Dropped" then
-		if carriedBy[uid] then
-			Notify(player, "Someone is already following you! Get them to your gym first.", "fail")
+		local slot = PlotService.FindOpenSlot(myPlot.Id)
+		if not slot then
+			fullNotice(player)
 			return
 		end
-		startFollow(player, rec)
-		Notify(player, rec.Name .. " is following you! Lead them to your gym.", "success")
+		local wasOnBelt = rec.State == "OnBelt"
+		rec.CarrierUserId = uid
+		sendToOwnMachine(rec, myPlot, slot, Constants.NPC.TravelSpeed)
+		if wasOnBelt then
+			hopOffBelt(rec)
+		end
+		local station = PlotService.GetStation(myPlot.Id, slot)
+		Notify(player, rec.Name .. " is heading to your " .. (station and PlotService.StationName(station) or "gym") .. "! +$" .. Constants.FormatNumber(rec.Income) .. "/s", "success")
 		return
 	end
 
@@ -445,22 +437,30 @@ function InfluencerService.OnGrab(player, rec)
 			Notify(player, rec.Name .. " is already training at your gym.", "info")
 			return
 		end
-		if carriedBy[uid] then
-			Notify(player, "Someone is already following you!", "fail")
+		local slot = PlotService.FindOpenSlot(myPlot.Id)
+		if not slot then
+			fullNotice(player)
 			return
 		end
-		-- THEFT: keep the origin slot reserved so it can return if the thief is caught
+		-- THEFT: keep the origin slot reserved so it can return if the front desk catches them
 		rec.OriginPlotId = plot.Id
 		rec.OriginSlot = rec.Slot
-		rec.PlotId = nil
-		rec.Slot = nil
-		startFollow(player, rec)
+		rec.CarrierUserId = uid
+		myPlot.Slots[slot] = rec
+		rec.PlotId = myPlot.Id
+		rec.Slot = slot
+		setState(rec, "Stolen")
+		rec.Model:SetAttribute("OwnerUserId", uid)
 		refreshRackAttr(plot)
+		refreshRackAttr(myPlot)
+		walkTo(rec, myPlot, slot, Constants.NPC.TravelSpeed, function()
+			InfluencerService.FinishTheft(rec)
+		end)
 
 		local victim = PlotService.GetOwnerPlayer(plot)
-		Notify(player, "You lured " .. rec.Name .. " away! Get them to YOUR gym before the front desk catches you!", "info")
+		Notify(player, "You lured " .. rec.Name .. " away! They're heading to your gym — hope the front desk doesn't catch them!", "info")
 		if victim then
-			Notify(victim, player.DisplayName .. " is stealing your " .. rec.Name .. "!", "fail")
+			Notify(victim, player.DisplayName .. " is stealing your " .. rec.Name .. "! Your front desk is on it!", "fail")
 		end
 		if InfluencerService.OnTheftStarted then
 			InfluencerService.OnTheftStarted(rec, player, plot)
@@ -469,7 +469,7 @@ function InfluencerService.OnGrab(player, rec)
 end
 
 function InfluencerService.GetCarried(player)
-	return carriedBy[player.UserId]
+	return nil
 end
 
 function InfluencerService.GetCarrierPlayer(rec)
@@ -477,52 +477,61 @@ function InfluencerService.GetCarrierPlayer(rec)
 end
 
 -- ----------------------------------------------------------------------
--- Public: placing / dropping / returning
+-- Public: theft outcomes
 -- ----------------------------------------------------------------------
--- The follower walked into its leader's gym: claim a slot and walk to the machine.
-function InfluencerService.Place(rec, plot, slot, ownerPlayer)
-	if rec.OriginPlotId then
-		local originPlot = PlotService.GetPlotById(rec.OriginPlotId)
-		if originPlot then
-			if originPlot.Slots[rec.OriginSlot] == rec then
-				originPlot.Slots[rec.OriginSlot] = nil
-			end
-			local victim = PlotService.GetOwnerPlayer(originPlot)
-			if victim then
-				removeFromProfile(victim, rec.OriginSlot)
-				Notify(victim, (ownerPlayer and ownerPlayer.DisplayName or "Someone") .. " stole your " .. rec.Name .. "!", "fail")
-			end
-			refreshRackAttr(originPlot)
-			if InfluencerService.OnTheftEnded then
-				InfluencerService.OnTheftEnded(rec, originPlot)
-			end
-		end
-		rec.OriginPlotId = nil
-		rec.OriginSlot = nil
+-- The stolen influencer reached the thief's machine: it's theirs now.
+function InfluencerService.FinishTheft(rec)
+	local plot = rec.PlotId and PlotService.GetPlotById(rec.PlotId)
+	local slot = rec.Slot
+	if not plot or plot.Slots[slot] ~= rec then
+		InfluencerService.ReturnToOrigin(rec)
+		return
 	end
-
-	endFollow(rec)
-	walkToStation(rec, plot, slot)
-
-	local owner = ownerPlayer or PlotService.GetOwnerPlayer(plot)
+	local originPlot = rec.OriginPlotId and PlotService.GetPlotById(rec.OriginPlotId)
+	if originPlot then
+		if originPlot.Slots[rec.OriginSlot] == rec then
+			originPlot.Slots[rec.OriginSlot] = nil
+		end
+		local victim = PlotService.GetOwnerPlayer(originPlot)
+		local thief = PlotService.GetOwnerPlayer(plot)
+		if victim then
+			removeFromProfile(victim, rec.OriginSlot)
+			Notify(victim, (thief and thief.DisplayName or "Someone") .. " stole your " .. rec.Name .. "!", "fail")
+		end
+		refreshRackAttr(originPlot)
+		if InfluencerService.OnTheftEnded then
+			InfluencerService.OnTheftEnded(rec, originPlot)
+		end
+	end
+	rec.OriginPlotId = nil
+	rec.OriginSlot = nil
+	sitOnStation(rec, plot, slot)
+	local owner = PlotService.GetOwnerPlayer(plot)
 	if owner then
 		addToProfile(owner, rec)
-		local station = PlotService.GetStation(plot.Id, slot)
-		local what = station and PlotService.StationName(station) or "a machine"
-		Notify(owner, rec.Name .. " is heading to the " .. what .. "! +$" .. Constants.FormatNumber(rec.Income) .. "/s", "success")
+		Notify(owner, rec.Name .. " joined your gym! +$" .. Constants.FormatNumber(rec.Income) .. "/s", "success")
 	end
 end
 
--- Thief caught: walk back to the original machine.
+-- Front desk caught them (or the thief left): walk back to the original machine.
 function InfluencerService.ReturnToOrigin(rec)
 	local originPlot = rec.OriginPlotId and PlotService.GetPlotById(rec.OriginPlotId)
 	local originSlot = rec.OriginSlot
+	-- free the thief's reserved machine
+	if rec.PlotId and rec.Slot then
+		local plot = PlotService.GetPlotById(rec.PlotId)
+		if plot and plot.Slots[rec.Slot] == rec and plot ~= originPlot then
+			plot.Slots[rec.Slot] = nil
+			refreshRackAttr(plot)
+		end
+	end
 	rec.OriginPlotId = nil
 	rec.OriginSlot = nil
-	endFollow(rec)
+	rec.CarrierUserId = nil
+	NpcService.Stop(rec.Model)
 
 	if originPlot and originPlot.OwnerUserId ~= 0 and originPlot.Slots[originSlot] == rec then
-		walkToStation(rec, originPlot, originSlot, Constants.NPC.ReturnSpeed, "Returning")
+		sendToOwnMachine(rec, originPlot, originSlot, Constants.NPC.ReturnSpeed, "Returning")
 	else
 		dropHere(rec)
 	end
@@ -538,25 +547,27 @@ function InfluencerService.DropFromBelt(rec)
 	end
 end
 
--- Leader died / left / rebirthed / dismissed.
+-- The player left / rebirthed: anything they were stealing goes back home.
 function InfluencerService.DropCarried(player)
-	local rec = carriedBy[player.UserId]
-	if not rec then
-		return
-	end
-	if rec.OriginPlotId then
-		InfluencerService.ReturnToOrigin(rec)
-	else
-		endFollow(rec)
-		dropHere(rec)
+	for _, rec in pairs(records) do
+		if rec.State == "Stolen" and rec.CarrierUserId == player.UserId then
+			InfluencerService.ReturnToOrigin(rec)
+		end
 	end
 end
 
 -- Destroys every influencer placed on / walking to a plot (does NOT touch the profile).
 function InfluencerService.ClearPlot(plot)
 	for slot, rec in pairs(plot.Slots) do
-		if rec and rec.Model and (rec.State == "Placed" or rec.State == "Seating" or rec.State == "Returning") then
-			InfluencerService.Destroy(rec)
+		if rec and rec.Model then
+			if rec.State == "Stolen" and rec.OriginPlotId == plot.Id then
+				-- being stolen FROM this plot: it's gone for good, the thief keeps walking
+				rec.OriginPlotId, rec.OriginSlot = nil, nil
+			elseif rec.State == "Stolen" then
+				InfluencerService.ReturnToOrigin(rec) -- was being stolen BY this plot's owner
+			else
+				InfluencerService.Destroy(rec)
+			end
 		end
 		plot.Slots[slot] = nil
 	end
@@ -591,50 +602,15 @@ local tickAccum = 0
 local despawnAccum = 0
 local emoteAccum = 0
 
-local function checkArrivedHome(player, rec)
-	local plot = PlotService.GetPlotByOwner(player.UserId)
-	if not plot or not PlotService.IsInsideGym(plot, rec.Root.Position) then
-		return
-	end
-	local slot = PlotService.FindOpenSlot(plot.Id)
-	if not slot then
-		local now = os.clock()
-		if not rackFullDebounce[player.UserId] or now - rackFullDebounce[player.UserId] > 4 then
-			rackFullDebounce[player.UserId] = now
-			Notify(player, "Every machine on your open floors is taken! Buy another Gym Floor in the Shop.", "fail")
-		end
-		return
-	end
-	InfluencerService.Place(rec, plot, slot, player)
-end
-
 function InfluencerService.Update(dt)
 	tickAccum += dt
-	if tickAccum >= 0.2 then
+	if tickAccum >= 0.25 then
 		tickAccum = 0
-		for uid, rec in pairs(carriedBy) do
-			local player = Players:GetPlayerByUserId(uid)
-			local character = player and player.Character
-			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-			if not rec.Model then
-				carriedBy[uid] = nil
-			elseif player and humanoid and humanoid.Health > 0 then
-				checkArrivedHome(player, rec)
-			elseif player then
-				InfluencerService.DropCarried(player)
-			else
-				endFollow(rec)
-				dropHere(rec)
-			end
-		end
-		-- fell off the world?
+		-- fell off the world while walking? just finish the trip
 		for _, rec in pairs(records) do
 			if rec.Root and rec.Root.Position.Y < -40 then
-				if rec.State == "Following" and rec.CarrierUserId then
-					local lr = NpcService.GetLeaderRoot(rec.Model)
-					if lr then
-						rec.Model:PivotTo(lr.CFrame * CFrame.new(0, 2, 5))
-					end
+				if rec.Arrive then
+					task.defer(rec.Arrive)
 				else
 					task.defer(InfluencerService.Destroy, rec)
 				end

@@ -2,7 +2,7 @@
 	Map — a compact linear world.
 
 	  - 8 slim gyms, 4 per side, packed along a short red-carpet boulevard
-	    (76 studs apart, front doors 20 studs from the carpet).
+	    (76 studs apart, front doors ~50 studs back from the carpet).
 	  - The conveyor runs along +Z out of a single drop tunnel; the map is kept
 	    short so every gym is close to it.
 	  - Realistic dressing: layered trees with tapered trunks, branches and
@@ -19,8 +19,8 @@ local M = Enum.Material
 local rad = math.rad
 
 Map.LOT_Z = { -114, -38, 38, 114 } -- 76 studs apart (20-stud gaps between gyms)
-Map.LOT_X = 76 -- gym center from the carpet center line (front door at 40)
-Map.HALF_X = 132
+Map.LOT_X = 106 -- gym center from the carpet center line (front door at 70: ~50-stud front yard)
+Map.HALF_X = 162
 Map.HALF_Z = 178
 Map.BELT_Z0 = -158
 Map.BELT_Z1 = 158
@@ -280,6 +280,11 @@ function Map.Build(workspace)
 			end
 			lamp(env, Vector3.new(side * (x0 + 2), 0, doorZ - 8), Vector3.new(-side, 0, 0))
 			lamp(env, Vector3.new(side * (x0 + 2), 0, doorZ + 8), Vector3.new(-side, 0, 0))
+			lamp(env, Vector3.new(side * (x1 - 6), 0, doorZ - 8), Vector3.new(side, 0, 0))
+			lamp(env, Vector3.new(side * (x1 - 6), 0, doorZ + 8), Vector3.new(side, 0, 0))
+			-- a tree either side of the long front walk
+			tree(nature, Vector3.new(side * ((x0 + x1) / 2), 0, doorZ - 16), 0.8, id * 3 + 1)
+			tree(nature, Vector3.new(side * ((x0 + x1) / 2), 0, doorZ + 16), 0.8, id * 3 + 2)
 			-- a tree or two in the side yards between gyms
 			if li < #Map.LOT_Z then
 				local zMid = (z + Map.LOT_Z[li + 1]) / 2

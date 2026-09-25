@@ -218,7 +218,7 @@ function B.Bike(st, L, sp)
 		setPrimary(pm, Geo.decorate(Geo.part(pm, "Pedal", Vector3.new(0.42, 0.08, 0.5), L(CFrame.new(pos)), Pal.FrameDark, M.Metal)))
 		Geo.decorate(Geo.part(pm, "Strap", Vector3.new(0.44, 0.12, 0.06), L(CFrame.new(pos + Vector3.new(0, 0.1, -0.12))), Pal.Accent, M.Rubber, { Role = "Accent" }))
 	end
-	return CFrame.new(0, sp.SaddleTop + 0.9, sp.SaddleZ), Vector3.new(2.0, 0, 1.2)
+	return CFrame.new(0, sp.SaddleTop + 0.9, sp.SaddleZ), Vector3.new(0, 0, 3.4) -- board from the open aisle behind
 end
 
 function B.BenchPress(st, L, sp)
@@ -249,7 +249,7 @@ function B.BenchPress(st, L, sp)
 	end
 	barbell(st:FindFirstChild("Moving"), "Bar", L(CFrame.new(0, sp.HookY, sp.HookZ)))
 	local rider = CFrame.new(0, sp.PadTop + 0.5, sp.PelvisZ) * CFrame.Angles(rad(90), 0, 0)
-	return rider, Vector3.new(2.3, 0, -0.9)
+	return rider, Vector3.new(0, 0, sp.PadZ0 - 2.2) -- board from the foot end (aisle side)
 end
 
 function B.DumbbellCurl(st, L, sp)
@@ -383,7 +383,7 @@ function B.LegExtension(st, L, sp)
 		Geo.beam(st, "HandlePost", P(s * sp.HandleX, sp.SeatTop - 0.25, sp.SeatZ + 0.1), (L(h)).Position, 0.14, Pal.Frame, M.Metal)
 		grip(st, "Handle", L(h * CFrame.Angles(0, rad(90), 0)), 0.6, 0.2)
 	end
-	return CFrame.new(0, sp.SeatTop + 1, 0.3), Vector3.new(-2.2, 0, 0.4)
+	return CFrame.new(0, sp.SeatTop + 1, 0.3), Vector3.new(0, 0, sp.PivotZ - 2.0) -- board from the front
 end
 
 function B.Deadlift(st, L, sp)

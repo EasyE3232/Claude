@@ -44,8 +44,8 @@ local SLAB = 1
 local AX = Gym.AISLE_X
 
 -- stair corner (back-right): two 5-wide flights side by side + a landing
-local FLIGHT_W = 5
-local STAIR_X0 = HW - 1 - FLIGHT_W * 2 -- 17
+local FLIGHT_W = 6
+local STAIR_X0 = HW - 1 - FLIGHT_W * 2 -- 15
 local STAIR_X1 = HW - 1 -- 27
 local LANDING_D = 5
 local RUN = 15
@@ -149,7 +149,8 @@ local function flight(parent, L, x, z0, z1, y0, y1, railSides)
 	local dir = z1 > z0 and 1 or -1
 	local a = L(x, y0 + 0.5, z0).Position
 	local b = L(x, y1 + 0.5, z1).Position
-	local ramp = Geo.part(parent, "StairRamp", Vector3.new(FLIGHT_W, 0.6, (b - a).Magnitude), CFrame.lookAt((a + b) / 2, b) * CFrame.new(0, -0.3, 0), Pal.Black, M.SmoothPlastic, { Transparency = 1 })
+	-- thick, slightly wider-than-treads invisible ramp = smooth, reliable walking (players and NPC pathfinding)
+	local ramp = Geo.part(parent, "StairRamp", Vector3.new(FLIGHT_W, 1.2, (b - a).Magnitude + 0.4), CFrame.lookAt((a + b) / 2, b) * CFrame.new(0, -0.6, 0), Pal.Black, M.SmoothPlastic, { Transparency = 1 })
 	ramp.CastShadow = false
 	local steps = math.floor(y1 - y0 + 0.5)
 	local run = math.abs(z1 - z0) / steps
@@ -174,7 +175,7 @@ local function switchback(parent, L, fromFloor)
 	local y1 = y0 + FH
 	local xA = STAIR_X0 + FLIGHT_W / 2 -- first flight (inner, toward the room)
 	local xB = STAIR_X1 - FLIGHT_W / 2 -- second flight (against the side glass)
-	flight(parent, L, xA, STAIR_Z0, LANDING_Z0, y0, yMid, { [-1] = true })
+	flight(parent, L, xA, STAIR_Z0, LANDING_Z0, y0, yMid, { [-1] = true, [1] = true })
 	-- landing platform against the back wall
 	local land = Geo.part(parent, "Landing", Vector3.new(FLIGHT_W * 2, 0.5, LANDING_D), L((STAIR_X0 + STAIR_X1) / 2, yMid + 0.25, (LANDING_Z0 + STAIR_Z1) / 2), TREAD_WOOD, M.WoodPlanks)
 	Geo.decorate(Geo.part(parent, "LandingEdge", Vector3.new(FLIGHT_W * 2, 1, 0.3), L((STAIR_X0 + STAIR_X1) / 2, yMid - 0.3, LANDING_Z0 + 0.15), STEEL_BLACK, M.Metal))
@@ -290,7 +291,7 @@ local function dressFloor(parent, L, f)
 	local mirror = Geo.part(parent, "Mirror", Vector3.new(STAIR_X0 + HW - 2, 7.5, 0.15), L((-HW + 1 + STAIR_X0 - 1) / 2, y + 4.6, HD - 1.3), Color3.fromRGB(205, 212, 220), M.Glass, { Reflectance = 0.55, CanCollide = false })
 	mirror.CastShadow = false
 	local rackZ = HD - 3.3
-	for _, seg in ipairs({ { -26, -6 }, { 6, 15 } }) do
+	for _, seg in ipairs({ { -26, -6 }, { 5, 13 } }) do
 		local cx, len = (seg[1] + seg[2]) / 2, seg[2] - seg[1]
 		Geo.part(parent, "DumbbellRack", Vector3.new(len, 0.25, 2.4), L(cx, y + 1.7, rackZ), Pal.Frame, M.Metal, { CanCollide = false })
 		for _, x in ipairs({ seg[1] + 0.5, cx, seg[2] - 0.5 }) do
@@ -311,12 +312,14 @@ local function dressFloor(parent, L, f)
 	Geo.decorate(Geo.part(parent, "AccentStrip", Vector3.new(STAIR_X0 + HW - 2, 0.3, 0.2), L((-HW + 1 + STAIR_X0 - 1) / 2, y + 8.9, HD - 1.15), Pal.Accent, M.Neon, { Role = "Accent" }))
 
 	-- ceiling: black panel, ducts, LED fixtures with real light
-	Geo.decorate(Geo.part(parent, "Ceiling", Vector3.new(W - 1, 0.1, D - 1), L(0, ceil - 0.06, 0), Pal.Ceiling, M.SmoothPlastic))
+	-- (the ceiling panel stops at the stairwell so you can see up the stairs)
+	Geo.decorate(Geo.part(parent, "Ceiling", Vector3.new(STAIR_X0 + HW - 0.5, 0.1, D - 1), L((-HW + 0.5 + STAIR_X0) / 2, ceil - 0.06, 0), Pal.Ceiling, M.SmoothPlastic))
+	Geo.decorate(Geo.part(parent, "Ceiling", Vector3.new(HW - STAIR_X0 - 0.5, 0.1, STAIR_Z0 + HD - 0.5), L((STAIR_X0 + HW - 0.5) / 2, ceil - 0.06, (-HD + 0.5 + STAIR_Z0) / 2), Pal.Ceiling, M.SmoothPlastic))
 	for _, x in ipairs({ -14, 8 }) do
 		Geo.decorate(Geo.tube(parent, "Duct", L(x, ceil - 1.5, -HD + 2).Position, L(x, ceil - 1.5, STAIR_Z0 - 2).Position, 1.8, Pal.Duct, M.Foil))
 	end
 	for _, x in ipairs({ -18, 0, 18 }) do
-		local fx = Geo.decorate(Geo.part(parent, "LEDStrip", Vector3.new(0.5, 0.18, 54), L(x, ceil - 0.25, -6), Pal.LED, M.Neon))
+		local fx = Geo.decorate(Geo.part(parent, "LEDStrip", Vector3.new(0.5, 0.18, 46), L(x, ceil - 0.25, -10), Pal.LED, M.Neon))
 		local light = Instance.new("SurfaceLight")
 		light.Face = Enum.NormalId.Bottom
 		light.Range = 18

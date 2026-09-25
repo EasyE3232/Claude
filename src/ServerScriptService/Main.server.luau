@@ -45,9 +45,6 @@ local function onCharacterAdded(player, character)
 	local humanoid = character:WaitForChild("Humanoid", 10)
 	if humanoid then
 		humanoid.WalkSpeed = Constants.NORMAL_WALKSPEED
-		humanoid.Died:Connect(function()
-			InfluencerService.DropCarried(player)
-		end)
 	end
 	player:SetAttribute("Stunned", false)
 	player:SetAttribute("Carrying", "")
@@ -101,7 +98,7 @@ local function onPlayerRemoving(player)
 	if plot and profile then
 		-- anything being lured out of this gym right now is gone for good
 		for slot, rec in pairs(plot.Slots) do
-			if rec and rec.State == "Following" then
+			if rec and rec.State == "Stolen" and rec.OriginPlotId == plot.Id then
 				for i = #profile.Placed, 1, -1 do
 					if profile.Placed[i].Slot == slot then
 						table.remove(profile.Placed, i)

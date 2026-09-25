@@ -31,6 +31,7 @@ for _, name in ipairs({ "GymWarsMap", "Baseplate", "SpawnLocation", "Influencers
 end
 Map.Build(workspace)
 workspace.StreamingEnabled = false
+StarterPlayer.CharacterWalkSpeed = 36 -- 2x speed (Constants.NORMAL_WALKSPEED matches)
 
 -- New gyms start as one story: floors 2-3 (and their roofs) wait in
 -- ServerStorage until the owner buys them (PlotService moves them in).

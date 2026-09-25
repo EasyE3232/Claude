@@ -417,6 +417,19 @@ function NpcService.Chase(model, player, speed)
 	c.LastProgressAt = os.clock()
 end
 
+-- Chase another model (e.g. a stolen influencer).
+function NpcService.ChaseModel(model, target, speed)
+	local c = newController(model)
+	c.Humanoid.WalkSpeed = speed or 16
+	if c.Mode == "ChaseModel" and c.TargetModel == target then
+		return
+	end
+	c.Mode = "ChaseModel"
+	c.TargetModel = target
+	c.Waypoints = nil
+	c.LastProgressAt = os.clock()
+end
+
 function NpcService.Stop(model)
 	local c = controllers[model]
 	if c then
@@ -588,6 +601,13 @@ function NpcService._step(dt)
 						c.Root.CFrame = CFrame.lookAt(c.Root.Position, c.Root.Position + to)
 					end
 				end
+			else
+				c.Humanoid:MoveTo(c.Root.Position)
+			end
+		elseif c.Mode == "ChaseModel" then
+			local tr = c.TargetModel and c.TargetModel.Parent and c.TargetModel:FindFirstChild("HumanoidRootPart")
+			if tr then
+				steer(c, tr.Position, 1)
 			else
 				c.Humanoid:MoveTo(c.Root.Position)
 			end

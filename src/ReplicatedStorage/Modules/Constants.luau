@@ -36,12 +36,13 @@ Constants.BELT = {
 -- INFLUENCER NPCs (real R15 characters)
 -- ======================================================================
 Constants.NPC = {
-	FollowSpeed = 11, -- they walk WITH you, slower than you (NORMAL_WALKSPEED)
-	FollowGap = 5, -- studs they trail behind you
-	SeatSpeed = 9, -- walking pace from your door to their machine
-	ReturnSpeed = 12, -- walking back to their gym after the front desk saves them
-	TeleportIfFartherThan = 160, -- rubber-band if they get hopelessly separated
-	SeatTimeout = 25, -- seconds before we just put them on the machine
+	TravelSpeed = 16, -- once claimed they walk on their own straight to their machine
+	FollowSpeed = 16, -- (legacy follow mode, unused by default)
+	FollowGap = 5,
+	SeatSpeed = 12,
+	ReturnSpeed = 16, -- walking back to their gym after the front desk saves them
+	TeleportIfFartherThan = 160,
+	SeatTimeout = 20, -- seconds before a stuck influencer just hops onto the machine
 	EmoteChance = 0.12, -- per second, while riding the belt
 }
 
@@ -156,8 +157,8 @@ Constants.EQUIPMENT = {
 	},
 	DeskSpeed = {
 		Name = "Front Desk Speed",
-		Desc = "How fast your front desk worker chases thieves",
-		Values = { 16, 19, 22, 26, 32 },
+		Desc = "How fast your front desk worker chases stolen influencers",
+		Values = { 18, 21, 24, 28, 34 },
 		Costs = { 0, 1000, 4000, 15000, 50000 },
 		Unit = " speed",
 	},
@@ -198,10 +199,8 @@ Constants.DEFENSE = {
 -- ======================================================================
 -- MOVEMENT
 -- ======================================================================
-Constants.NORMAL_WALKSPEED = 18
--- influencers now WALK behind you (at NPC.FollowSpeed) instead of being carried,
--- so escorting no longer slows you down
-Constants.CARRY_WALKSPEED = 18
+Constants.NORMAL_WALKSPEED = 36 -- 2x the Roblox default feel for this map
+Constants.CARRY_WALKSPEED = 36
 
 -- ======================================================================
 -- GYM COLOR PRESETS (owner-selectable, cosmetic only). Saved as preset index.

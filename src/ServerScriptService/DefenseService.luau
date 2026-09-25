@@ -1,9 +1,10 @@
 --[[
 	DefenseService
 	One Front Desk Worker per gym (a real R15 humanoid in a staff shirt). When
-	someone lures an influencer out of that gym, the worker runs after the thief
-	ANYWHERE on the map, pathfinding around walls. On catch: the influencer
-	walks back to its machine and the thief is knocked down and stunned.
+	someone lures an influencer out of that gym, the worker runs after the
+	STOLEN INFLUENCER anywhere on the map, pathfinding around walls. On catch:
+	the influencer walks back to its machine. A thief standing close by when
+	the catch happens gets knocked down and stunned.
 
 	Worker speed = Constants.EQUIPMENT.DeskSpeed.Values[owner's DeskSpeed level]
 
@@ -149,7 +150,7 @@ local function onTheftStarted(rec, thief, victimPlot)
 	table.insert(w.Thefts, { Rec = rec, ThiefUserId = thief.UserId })
 	w.State = "Chase"
 	setLabel(w, "STOP! THIEF!", Color3.fromRGB(255, 90, 90))
-	NpcService.Chase(w.Model, thief, deskSpeed(victimPlot))
+	NpcService.ChaseModel(w.Model, rec.Model, deskSpeed(victimPlot))
 end
 
 local function onTheftEnded(rec, victimPlot)
@@ -173,7 +174,7 @@ end
 local function currentTarget(w)
 	for i = #w.Thefts, 1, -1 do
 		local t = w.Thefts[i]
-		local stillStolen = t.Rec.Model and t.Rec.State == "Following" and t.Rec.CarrierUserId == t.ThiefUserId
+		local stillStolen = t.Rec.Model and t.Rec.State == "Stolen" and t.Rec.CarrierUserId == t.ThiefUserId
 		if not stillStolen then
 			table.remove(w.Thefts, i)
 		end
@@ -194,23 +195,24 @@ local function step(dt)
 			if not t then
 				goHome(w)
 			else
-				local thief = Players:GetPlayerByUserId(t.ThiefUserId)
-				local character = thief and thief.Character
-				local hrp = character and character:FindFirstChild("HumanoidRootPart")
-				if hrp then
-					-- keep chasing the current thief at the current desk speed
-					NpcService.Chase(w.Model, thief, deskSpeed(w.Plot))
-					local d = (hrp.Position - w.Root.Position) * Vector3.new(1, 0, 1)
-					if d.Magnitude <= Constants.DEFENSE.CatchRadius then
-						-- CAUGHT
-						local rec = t.Rec
-						InfluencerService.ReturnToOrigin(rec) -- fires onTheftEnded
-						knockDown(thief, w.Root.Position)
-						Notify(thief, "The Front Desk caught you! " .. rec.Name .. " is heading back.", "fail")
-						local owner = PlotService.GetOwnerPlayer(w.Plot)
-						if owner then
-							Notify(owner, "Your Front Desk caught " .. thief.DisplayName .. " and saved " .. rec.Name .. "!", "success")
+				local rec = t.Rec
+				local target = rec.Root
+				NpcService.ChaseModel(w.Model, rec.Model, deskSpeed(w.Plot))
+				local d = (target.Position - w.Root.Position) * Vector3.new(1, 0, 1)
+				if d.Magnitude <= Constants.DEFENSE.CatchRadius + 1 then
+					-- CAUGHT
+					local thief = Players:GetPlayerByUserId(t.ThiefUserId)
+					InfluencerService.ReturnToOrigin(rec) -- fires onTheftEnded
+					if thief then
+						local hrp = thief.Character and thief.Character:FindFirstChild("HumanoidRootPart")
+						if hrp and (hrp.Position - w.Root.Position).Magnitude < 12 then
+							knockDown(thief, w.Root.Position)
 						end
+						Notify(thief, "The Front Desk caught " .. rec.Name .. " and walked them back!", "fail")
+					end
+					local owner = PlotService.GetOwnerPlayer(w.Plot)
+					if owner then
+						Notify(owner, "Your Front Desk saved " .. rec.Name .. "!", "success")
 					end
 				end
 			end
