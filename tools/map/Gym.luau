@@ -1,19 +1,21 @@
 --[[
-	Gym — builds one complete gym lot: a glass fitness club that GROWS.
+	Gym — builds one complete gym lot: a slim glass fitness club that GROWS.
 
 	  Floor 1 (free)   Cardio & Dumbbells : 3 treadmills, 3 bikes, 3 curl stations, 3 shoulder press
 	  Floor 2 (bought) Machines           : 3 lat pulldowns, 3 cable rows, 3 leg extensions, 3 pull-up
 	  Floor 3 (bought) Power Zone         : 3 squat racks, 3 deadlift platforms, 3 bench presses
 
-	Everything that belongs to floor N (slab, glass, stairs up to it, machines,
-	lights) lives in the folder FloorN, and each roof height lives in RoofN.
-	PlotService keeps FloorN / RoofN hidden (in ServerStorage) until the owner
-	buys that floor, so the building visibly gets taller.
+	Everything that belongs to floor N (slab, glass, the stairs up to it,
+	machines, lights) lives in the folder FloorN, and each roof height lives
+	in RoofN. PlotService keeps FloorN / RoofN hidden (in ServerStorage) until
+	the owner buys that floor, so the building visibly gets taller.
 
-	Layout: the front door lines up with a clear center aisle (x -10..-2) that
-	runs straight to the back wall. Machines sit in groups of three on either
-	side of it. The stair core is on the right (x 26..38); a side aisle
-	(x 20..26) connects it to every floor.
+	Stairs: a U-shaped switchback in the back-right corner (open risers, wood
+	treads, black steel stringers, cable railings): half a flight up to a
+	landing against the back wall, then the second half turns back.
+
+	Layout: the front door lines up with a clear center aisle that runs
+	straight to the back wall; machines sit in groups of three either side.
 
 	Plot-local space: origin at the building's floor center (ground level),
 	-Z faces the conveyor (the entrance side), +Y up.
@@ -28,19 +30,29 @@ local Pal = Geo.Palette
 local M = Enum.Material
 local rad = math.rad
 
-Gym.W = 76
-Gym.D = 64
+Gym.W = 56 -- frontage (along the carpet)
+Gym.D = 72 -- depth
 Gym.FLOOR_H = 16
 Gym.FLOORS = 3
 Gym.FLOOR_Y = 0.4
 Gym.H = Gym.FLOOR_H * Gym.FLOORS
-Gym.AISLE_X = -6 -- center of the entrance aisle (the door lines up with it)
+Gym.AISLE_X = 0 -- entrance aisle center (the door lines up with it)
 
 local W, D, FH, FY = Gym.W, Gym.D, Gym.FLOOR_H, Gym.FLOOR_Y
 local HW, HD = W / 2, D / 2
-local CORE_X0, CORE_X1 = 26, 38
 local SLAB = 1
 local AX = Gym.AISLE_X
+
+-- stair corner (back-right): two 5-wide flights side by side + a landing
+local FLIGHT_W = 5
+local STAIR_X0 = HW - 1 - FLIGHT_W * 2 -- 17
+local STAIR_X1 = HW - 1 -- 27
+local LANDING_D = 5
+local RUN = 15
+local STAIR_Z1 = HD - 1 -- back wall face (35)
+local LANDING_Z0 = STAIR_Z1 - LANDING_D -- 30
+local STAIR_Z0 = LANDING_Z0 - RUN -- 15 (front edge of the stair corner)
+Gym.STAIR = { X0 = STAIR_X0, X1 = STAIR_X1, Z0 = STAIR_Z0, Z1 = STAIR_Z1 }
 
 local function floorTop(f)
 	return FY + (f - 1) * FH
@@ -50,28 +62,27 @@ Gym.floorTop = floorTop
 -- ----------------------------------------------------------------------
 -- Layout: each group = 3 identical machines side by side.
 -- ----------------------------------------------------------------------
-local LEFT = { -32.5, -23.5, -14.5 } -- left of the aisle
-local RIGHT = { 1.5, 9, 16.5 } -- right of the aisle
-local WIDE = { -27, -8.5, 10 } -- full-width rows for the big power equipment
+local LEFT = { -22.5, -15.5, -8.5 }
+local RIGHT = { 8.5, 15.5, 22.5 }
+local WIDE = { -19, 0, 19 }
 
--- per floor, in the same order as StationSpecs.FLOOR_GROUPS
 local GROUP_PLACES = {
-	{ -- floor 1
-		{ LEFT, -8, 0 }, -- treadmills facing the glass
-		{ RIGHT, -8, 0 }, -- bikes facing the glass
-		{ LEFT, 18, 180 }, -- curls facing the mirror
-		{ RIGHT, 18, 180 }, -- shoulder press facing the mirror
+	{ -- floor 1 (lobby at the front)
+		{ LEFT, -14, 0 }, -- treadmills facing the glass
+		{ RIGHT, -14, 0 }, -- bikes facing the glass
+		{ LEFT, 8, 180 }, -- curls facing the mirror
+		{ RIGHT, 8, 180 }, -- shoulder press facing the mirror
 	},
 	{ -- floor 2
-		{ LEFT, -16, 0 }, -- lat pulldowns
-		{ RIGHT, -16, 0 }, -- cable rows
-		{ LEFT, 14, 0 }, -- leg extensions
-		{ RIGHT, 14, 0 }, -- pull-up / dip assist
+		{ LEFT, -20, 0 }, -- lat pulldowns
+		{ RIGHT, -20, 0 }, -- cable rows
+		{ LEFT, 6, 0 }, -- leg extensions
+		{ RIGHT, 6, 0 }, -- pull-up / dip assist
 	},
 	{ -- floor 3
-		{ WIDE, -19, 0 }, -- squat racks
-		{ WIDE, 0, 0 }, -- deadlift platforms
-		{ WIDE, 18, 0 }, -- bench presses
+		{ WIDE, -26, 0 }, -- squat racks
+		{ WIDE, -8, 0 }, -- deadlift platforms
+		{ WIDE, 9, 0 }, -- bench presses
 	},
 }
 
@@ -92,6 +103,8 @@ end
 
 local DARK_FRAME = Color3.fromRGB(30, 31, 36)
 local GLASS = Color3.fromRGB(170, 200, 220)
+local STEEL_BLACK = Color3.fromRGB(24, 24, 27)
+local TREAD_WOOD = Color3.fromRGB(196, 158, 108)
 
 -- ----------------------------------------------------------------------
 -- Helpers
@@ -116,30 +129,62 @@ local function slab(parent, L, name, top, hole, color, material)
 	end
 end
 
--- One flight of stairs: invisible walkable ramp + floating steps + stringers
-local function flight(parent, L, x, z0, z1, y0, y1)
+-- Horizontal cable railing between two floor-level points (a, b in world),
+-- 3.4 tall, following any slope between them.
+local function cableRail(parent, a, b, posts)
+	posts = posts or math.max(2, math.floor((b - a).Magnitude / 4) + 1)
+	for k = 0, posts - 1 do
+		local p = a:Lerp(b, k / (posts - 1))
+		Geo.decorate(Geo.part(parent, "RailPost", Vector3.new(0.18, 3.5, 0.18), CFrame.new(p + Vector3.new(0, 1.75, 0)), STEEL_BLACK, M.Metal))
+	end
+	Geo.tube(parent, "RailTop", a + Vector3.new(0, 3.5, 0), b + Vector3.new(0, 3.5, 0), 0.2, STEEL_BLACK, M.Metal)
+	for h = 0.7, 2.9, 0.55 do
+		Geo.decorate(Geo.tube(parent, "RailCable", a + Vector3.new(0, h, 0), b + Vector3.new(0, h, 0), 0.05, Color3.fromRGB(150, 152, 158), M.Metal))
+	end
+end
+
+-- One flight: invisible walkable ramp + open-riser wood treads + black
+-- stringers + a cable railing on the open side(s).
+local function flight(parent, L, x, z0, z1, y0, y1, railSides)
 	local dir = z1 > z0 and 1 or -1
 	local a = L(x, y0 + 0.5, z0).Position
 	local b = L(x, y1 + 0.5, z1).Position
-	local ramp = Geo.part(parent, "StairRamp", Vector3.new(6, 0.6, (b - a).Magnitude), CFrame.lookAt((a + b) / 2, b) * CFrame.new(0, -0.3, 0), Pal.Black, M.SmoothPlastic, { Transparency = 1 })
+	local ramp = Geo.part(parent, "StairRamp", Vector3.new(FLIGHT_W, 0.6, (b - a).Magnitude), CFrame.lookAt((a + b) / 2, b) * CFrame.new(0, -0.3, 0), Pal.Black, M.SmoothPlastic, { Transparency = 1 })
 	ramp.CastShadow = false
 	local steps = math.floor(y1 - y0 + 0.5)
 	local run = math.abs(z1 - z0) / steps
 	for i = 1, steps do
 		local zc = z0 + dir * (i - 0.5) * run
-		Geo.decorate(Geo.part(parent, "Step", Vector3.new(6, 0.35, run + 0.1), L(x, y0 + i - 0.17, zc), Color3.fromRGB(58, 60, 66), M.Metal))
-		Geo.decorate(Geo.part(parent, "StepNose", Vector3.new(6, 0.08, 0.12), L(x, y0 + i + 0.02, zc - dir * run / 2), Pal.Accent, M.Neon, { Role = "Accent" }))
+		Geo.decorate(Geo.part(parent, "Tread", Vector3.new(FLIGHT_W - 0.4, 0.3, run * 0.92), L(x, y0 + i - 0.15, zc), TREAD_WOOD, M.WoodPlanks))
 	end
 	for _, s in ipairs({ -1, 1 }) do
-		local sa = L(x + s * 3.1, y0 + 0.2, z0).Position
-		local sb = L(x + s * 3.1, y1 + 0.2, z1).Position
-		Geo.decorate(Geo.beam(parent, "Stringer", sa, sb, 0.35, DARK_FRAME, M.Metal))
-		Geo.decorate(Geo.tube(parent, "Handrail", L(x + s * 3.1, y0 + 3.6, z0).Position, L(x + s * 3.1, y1 + 3.6, z1).Position, 0.16, Pal.Chrome, M.Metal))
-		for k = 0, 4 do
-			local p = sa:Lerp(sb, k / 4)
-			Geo.decorate(Geo.part(parent, "Baluster", Vector3.new(0.1, 3.4, 0.1), CFrame.new(p + Vector3.new(0, 1.7, 0)), Pal.Chrome, M.Metal))
+		local sa = L(x + s * (FLIGHT_W / 2 - 0.1), y0 + 0.1, z0).Position
+		local sb = L(x + s * (FLIGHT_W / 2 - 0.1), y1 + 0.1, z1).Position
+		Geo.decorate(Geo.beam(parent, "Stringer", sa, sb, 0.3, STEEL_BLACK, M.Metal)).Size = Vector3.new((sb - sa).Magnitude, 1.2, 0.25)
+		if railSides and railSides[s] then
+			cableRail(parent, sa + Vector3.new(0, 0.5, 0), sb + Vector3.new(0, 0.5, 0), 5)
 		end
 	end
+end
+
+-- Full floor-to-floor stair: flight up to the landing, landing, flight back.
+local function switchback(parent, L, fromFloor)
+	local y0 = floorTop(fromFloor)
+	local yMid = y0 + FH / 2
+	local y1 = y0 + FH
+	local xA = STAIR_X0 + FLIGHT_W / 2 -- first flight (inner, toward the room)
+	local xB = STAIR_X1 - FLIGHT_W / 2 -- second flight (against the side glass)
+	flight(parent, L, xA, STAIR_Z0, LANDING_Z0, y0, yMid, { [-1] = true })
+	-- landing platform against the back wall
+	local land = Geo.part(parent, "Landing", Vector3.new(FLIGHT_W * 2, 0.5, LANDING_D), L((STAIR_X0 + STAIR_X1) / 2, yMid + 0.25, (LANDING_Z0 + STAIR_Z1) / 2), TREAD_WOOD, M.WoodPlanks)
+	Geo.decorate(Geo.part(parent, "LandingEdge", Vector3.new(FLIGHT_W * 2, 1, 0.3), L((STAIR_X0 + STAIR_X1) / 2, yMid - 0.3, LANDING_Z0 + 0.15), STEEL_BLACK, M.Metal))
+	land.CastShadow = true
+	cableRail(parent, L(STAIR_X0 + 0.1, yMid + 0.5, LANDING_Z0).Position, L(STAIR_X0 + 0.1, yMid + 0.5, STAIR_Z1 - 0.3).Position, 3)
+	-- steel posts holding the landing
+	for _, x in ipairs({ STAIR_X0 + 0.3, STAIR_X1 - 0.3 }) do
+		Geo.part(parent, "LandingPost", Vector3.new(0.35, FH / 2, 0.35), L(x, y0 + FH / 4, LANDING_Z0 + 0.3), STEEL_BLACK, M.Metal)
+	end
+	flight(parent, L, xB, LANDING_Z0, STAIR_Z0, yMid, y1, { [-1] = true })
 end
 
 -- Glass curtain wall from (x0,z0) to (x1,z1) for one floor. doorAt = distance
@@ -176,11 +221,6 @@ local function curtain(parent, L, x0, z0, x1, z1, yBottom, yTop, doorAt, doorHal
 	end
 end
 
-local function coreWall(parent, L, f, z0, z1)
-	local h = FH - SLAB
-	Geo.part(parent, "CoreWall", Vector3.new(0.6, h, z1 - z0), L(CORE_X0, floorTop(f) + h / 2, (z0 + z1) / 2), Color3.fromRGB(22, 23, 27), M.Plaster)
-end
-
 -- The building envelope for one floor (glass, frame, back wall, bands)
 local function floorShell(parent, L, f)
 	local y0 = floorTop(f) + (f == 1 and 0 or 0.5)
@@ -201,59 +241,62 @@ local function floorShell(parent, L, f)
 	end
 end
 
--- Roof sitting on top of floor `level` (only one roof is shown at a time)
+-- Roof sitting on top of floor `level` (only one roof is shown at a time).
+-- On floors 2+ it also carries the railing that closes off the stair opening
+-- (the next floor's stairs would start there once it's bought).
 local function roof(parent, L, level)
 	local top = floorTop(level) + FH
 	slab(parent, L, "RoofSlab", top, nil, Color3.fromRGB(40, 41, 46), M.Concrete)
 	Geo.part(parent, "RoofEdge", Vector3.new(W + 3, 1.6, D + 3), L(0, top + 0.3, 0), DARK_FRAME, M.Metal, { Role = "Wall" })
 	for _, s in ipairs({ -1, 1 }) do
-		Geo.part(parent, "SignLeg", Vector3.new(0.5, 2, 0.5), L(s * 18, top + 1.2, -HD + 1.6), DARK_FRAME, M.Metal)
+		Geo.part(parent, "SignLeg", Vector3.new(0.5, 2, 0.5), L(s * 15, top + 1.2, -HD + 1.6), DARK_FRAME, M.Metal)
 	end
-	Geo.decorate(Geo.part(parent, "SignGlow", Vector3.new(45, 0.3, 1), L(0, top + 1.35, -HD + 1.2), Pal.LED, M.Neon))
-	-- rooftop AC units
-	for i, x in ipairs({ -24, -12 }) do
-		Geo.part(parent, "ACUnit", Vector3.new(6, 3, 5), L(x, top + 2.6, 18 - i * 2), Color3.fromRGB(150, 152, 156), M.Metal)
+	Geo.decorate(Geo.part(parent, "SignGlow", Vector3.new(40, 0.3, 1), L(0, top + 1.35, -HD + 1.2), Pal.LED, M.Neon))
+	for i, x in ipairs({ -16, -6 }) do
+		Geo.part(parent, "ACUnit", Vector3.new(6, 3, 5), L(x, top + 2.6, 20 - i * 2), Color3.fromRGB(150, 152, 156), M.Metal)
+	end
+	if level > 1 then
+		local y = floorTop(level)
+		cableRail(parent, L(STAIR_X0, y, STAIR_Z0).Position, L(STAIR_X0 + FLIGHT_W, y, STAIR_Z0).Position, 2)
 	end
 end
 
 local function dressFloor(parent, L, f)
 	local y = floorTop(f)
 	local ceil = y + FH - SLAB
+	local aisleColor = Color3.fromRGB(34, 36, 40)
 
 	-- clear walkways
 	if f == 3 then
-		Geo.decorate(Geo.part(parent, "Aisle", Vector3.new(58, 0.03, 6), L(-9, y + 0.015, -27.5), Color3.fromRGB(34, 36, 40), M.Rubber))
-		for _, z in ipairs({ -9.5, 9.5 }) do
-			Geo.decorate(Geo.part(parent, "Aisle", Vector3.new(58, 0.03, 4), L(-9, y + 0.015, z), Color3.fromRGB(34, 36, 40), M.Rubber))
+		for _, z in ipairs({ -32.5, -17, 1 }) do
+			Geo.decorate(Geo.part(parent, "Aisle", Vector3.new(W - 3, 0.03, 4), L(0, y + 0.015, z), aisleColor, M.Rubber))
 		end
 	else
-		local z0 = f == 1 and -19 or -HD + 0.5
-		Geo.decorate(Geo.part(parent, "Aisle", Vector3.new(8, 0.03, HD - 1.5 - z0), L(AX, y + 0.015, (z0 + HD - 1.5) / 2), Color3.fromRGB(34, 36, 40), M.Rubber))
+		local z0 = f == 1 and -24 or -HD + 0.5
+		Geo.decorate(Geo.part(parent, "Aisle", Vector3.new(8, 0.03, HD - 1.5 - z0), L(AX, y + 0.015, (z0 + HD - 1.5) / 2), aisleColor, M.Rubber))
 		for _, s in ipairs({ -1, 1 }) do
 			Geo.decorate(Geo.part(parent, "AisleLine", Vector3.new(0.2, 0.04, HD - 1.5 - z0), L(AX + s * 4, y + 0.02, (z0 + HD - 1.5) / 2), Color3.fromRGB(70, 100, 130), M.SmoothPlastic, { Role = "AccentDim" }))
 		end
-		-- cross aisle between the front and back groups
-		local cz = f == 1 and 6.5 or -1
-		Geo.decorate(Geo.part(parent, "Aisle", Vector3.new(58, 0.03, 4), L(-9, y + 0.016, cz), Color3.fromRGB(34, 36, 40), M.Rubber))
+		local cz = f == 1 and -3 or -8
+		Geo.decorate(Geo.part(parent, "Aisle", Vector3.new(W - 3, 0.03, 4), L(0, y + 0.016, cz), aisleColor, M.Rubber))
 	end
-	-- side aisle to the stairs
-	Geo.decorate(Geo.part(parent, "Aisle", Vector3.new(5.4, 0.03, D - 3), L(23, y + 0.015, 0), Color3.fromRGB(34, 36, 40), M.Rubber))
+	-- path from the aisle to the stairs
+	Geo.decorate(Geo.part(parent, "Aisle", Vector3.new(STAIR_X1 - 4, 0.03, 4), L((4 + STAIR_X1) / 2, y + 0.017, STAIR_Z0 - 2.5), aisleColor, M.Rubber))
 	if f == 1 then
-		Geo.decorate(Geo.part(parent, "LobbyFloor", Vector3.new(W - 14, 0.03, 12), L(-6, y + 0.018, -25), Color3.fromRGB(210, 205, 196), M.Marble))
+		Geo.decorate(Geo.part(parent, "LobbyFloor", Vector3.new(W - 3, 0.03, 11), L(0, y + 0.018, -30), Color3.fromRGB(210, 205, 196), M.Marble))
 	end
 
-	-- mirror wall + dumbbell rack along the back wall (rack sits either side of the aisle end)
-	local mirror = Geo.part(parent, "Mirror", Vector3.new(58, 7.5, 0.15), L(-8, y + 4.6, HD - 1.3), Color3.fromRGB(205, 212, 220), M.Glass, { Reflectance = 0.55, CanCollide = false })
+	-- mirror wall + dumbbell racks on the back wall (left of the stairs, around the aisle end)
+	local mirror = Geo.part(parent, "Mirror", Vector3.new(STAIR_X0 + HW - 2, 7.5, 0.15), L((-HW + 1 + STAIR_X0 - 1) / 2, y + 4.6, HD - 1.3), Color3.fromRGB(205, 212, 220), M.Glass, { Reflectance = 0.55, CanCollide = false })
 	mirror.CastShadow = false
 	local rackZ = HD - 3.3
-	for _, seg in ipairs({ { -34, -12 }, { 0, 18 } }) do
+	for _, seg in ipairs({ { -26, -6 }, { 6, 15 } }) do
 		local cx, len = (seg[1] + seg[2]) / 2, seg[2] - seg[1]
 		Geo.part(parent, "DumbbellRack", Vector3.new(len, 0.25, 2.4), L(cx, y + 1.7, rackZ), Pal.Frame, M.Metal, { CanCollide = false })
 		for _, x in ipairs({ seg[1] + 0.5, cx, seg[2] - 0.5 }) do
 			Geo.decorate(Geo.part(parent, "RackLeg", Vector3.new(0.4, 1.7, 2.2), L(x, y + 0.85, rackZ), Pal.FrameDark, M.Metal))
 		end
-		local n = math.floor(len / 3)
-		for i = 0, n - 1 do
+		for i = 0, math.floor(len / 3) - 1 do
 			local cf = L(seg[1] + 1.5 + i * 3, y + 2.1, rackZ)
 			local size = 0.45 + (i % 5) * 0.06
 			Geo.decorate(Geo.cyl(parent, "RackBellHandle", 0.55, 0.15, cf, Pal.Steel, M.Metal))
@@ -262,24 +305,18 @@ local function dressFloor(parent, L, f)
 			end
 		end
 	end
-
-	-- stair-core feature wall: blue stripes + floor sign
-	for i = 0, 13 do
-		local z = 18.5 - i * 2.6
-		if not (f == 2 and z > 13.5) and not (f ~= 2 and z < -13.5) then
-			Geo.decorate(Geo.part(parent, "StripePanel", Vector3.new(0.2, 9, 1.2), L(CORE_X0 - 0.45, y + 5.5, z), Pal.Accent, M.SmoothPlastic, { Role = "Accent" }))
-		end
-	end
-	local sign = Geo.decorate(Geo.part(parent, "FloorSign", Vector3.new(0.2, 2.2, 16), L(CORE_X0 - 0.5, y + 11.6, f == 2 and -4 or 4), Pal.Black, M.SmoothPlastic))
-	Geo.surfaceText(sign, Enum.NormalId.Left, "FLOOR " .. f .. "  ·  " .. Specs.FLOOR_NAMES[f], { Color = Color3.fromRGB(235, 242, 255), PPS = 24 })
+	-- floor sign + accent strip above the mirror
+	local sign = Geo.decorate(Geo.part(parent, "FloorSign", Vector3.new(26, 2.4, 0.2), L(-8, y + 10.6, HD - 1.15), Pal.Black, M.SmoothPlastic))
+	Geo.surfaceText(sign, Enum.NormalId.Front, "FLOOR " .. f .. "  ·  " .. Specs.FLOOR_NAMES[f], { Color = Color3.fromRGB(235, 242, 255), PPS = 24 })
+	Geo.decorate(Geo.part(parent, "AccentStrip", Vector3.new(STAIR_X0 + HW - 2, 0.3, 0.2), L((-HW + 1 + STAIR_X0 - 1) / 2, y + 8.9, HD - 1.15), Pal.Accent, M.Neon, { Role = "Accent" }))
 
 	-- ceiling: black panel, ducts, LED fixtures with real light
 	Geo.decorate(Geo.part(parent, "Ceiling", Vector3.new(W - 1, 0.1, D - 1), L(0, ceil - 0.06, 0), Pal.Ceiling, M.SmoothPlastic))
-	for _, z in ipairs({ -14, 12 }) do
-		Geo.decorate(Geo.tube(parent, "Duct", L(-HW + 2, ceil - 1.5, z).Position, L(CORE_X0 - 1, ceil - 1.5, z).Position, 1.8, Pal.Duct, M.Foil))
+	for _, x in ipairs({ -14, 8 }) do
+		Geo.decorate(Geo.tube(parent, "Duct", L(x, ceil - 1.5, -HD + 2).Position, L(x, ceil - 1.5, STAIR_Z0 - 2).Position, 1.8, Pal.Duct, M.Foil))
 	end
-	for _, z in ipairs({ -20, -2, 16 }) do
-		local fx = Geo.decorate(Geo.part(parent, "LEDStrip", Vector3.new(56, 0.18, 0.5), L(-8, ceil - 0.25, z), Pal.LED, M.Neon))
+	for _, x in ipairs({ -18, 0, 18 }) do
+		local fx = Geo.decorate(Geo.part(parent, "LEDStrip", Vector3.new(0.5, 0.18, 54), L(x, ceil - 0.25, -6), Pal.LED, M.Neon))
 		local light = Instance.new("SurfaceLight")
 		light.Face = Enum.NormalId.Bottom
 		light.Range = 18
@@ -313,31 +350,24 @@ function Gym.Build(parent, plotId, plotCF)
 		roofs[f]:SetAttribute("Level", f)
 	end
 
+	local hole = { STAIR_X0, STAIR_X1 + 1, STAIR_Z0, HD }
+
 	-- ================= floor 1 (always there) =================
 	local floor = Geo.part(model, "Floor", Vector3.new(W, FY, D), L(0, FY / 2, 0), Pal.RubberFloor, M.Rubber)
 	model.PrimaryPart = floor
 	floorShell(floors[1], L, 1)
-	coreWall(floors[1], L, 1, -17.5, 20)
 	Geo.part(floors[1], "Canopy", Vector3.new(16, 0.5, 6), L(AX, 11, -HD - 3), DARK_FRAME, M.Metal, { CanCollide = false })
 	Geo.decorate(Geo.part(floors[1], "CanopyLight", Vector3.new(15, 0.1, 0.3), L(AX, 10.7, -HD - 5.8), Pal.LED, M.Neon))
 	Geo.decorate(Geo.part(floors[1], "EntryMat", Vector3.new(10, 0.04, 5), L(AX, FY + 0.02, -HD + 3.5), Color3.fromRGB(20, 20, 22), M.Carpet))
 
-	-- ================= floor 2 (bought) =================
-	slab(floors[2], L, "Slab2", floorTop(2), { CORE_X0, CORE_X0 + 6, -16, 16 }, Pal.RubberFloor, M.Rubber)
-	floorShell(floors[2], L, 2)
-	flight(floors[2], L, CORE_X0 + 3.2, -16, 16, floorTop(1), floorTop(2))
-	Geo.part(floors[2], "CoreGlass", Vector3.new(0.25, FH - SLAB, 33.5), L(CORE_X0 + 6.3, floorTop(1) + (FH - SLAB) / 2, -0.75), GLASS, M.Glass, { Transparency = 0.6 })
-	Geo.part(floors[2], "CoreWall", Vector3.new(CORE_X1 - CORE_X0 - 6.3, FH - SLAB, 0.6), L((CORE_X0 + 6.3 + CORE_X1) / 2, floorTop(1) + (FH - SLAB) / 2, -17.5), Color3.fromRGB(22, 23, 27), M.Plaster)
-	coreWall(floors[2], L, 2, -20, 14)
-	Geo.part(floors[2], "StairGlass", Vector3.new(0.25, FH - SLAB, 33.5), L(CORE_X0 + 6, floorTop(2) + (FH - SLAB) / 2, 0.75), GLASS, M.Glass, { Transparency = 0.6 })
-
-	-- ================= floor 3 (bought) =================
-	slab(floors[3], L, "Slab3", floorTop(3), { CORE_X0 + 6, CORE_X1, -16, 16 }, Pal.RubberFloor, M.Rubber)
-	floorShell(floors[3], L, 3)
-	flight(floors[3], L, CORE_X0 + 8.8, 16, -16, floorTop(2), floorTop(3))
-	coreWall(floors[3], L, 3, -14, 20)
-	Geo.part(floors[3], "StairRail", Vector3.new(0.25, 3.6, 32), L(CORE_X0 + 6, floorTop(3) + 1.8, 0), GLASS, M.Glass, { Transparency = 0.5 })
-	Geo.part(floors[3], "StairRail", Vector3.new(6, 3.6, 0.25), L(CORE_X0 + 9, floorTop(3) + 1.8, 16), GLASS, M.Glass, { Transparency = 0.5 })
+	-- ================= floors 2 and 3 (bought): slab + envelope + the stairs up to them =================
+	for f = 2, Gym.FLOORS do
+		slab(floors[f], L, "Slab" .. f, floorTop(f), hole, Pal.RubberFloor, M.Rubber)
+		floorShell(floors[f], L, f)
+		switchback(floors[f], L, f - 1)
+		-- rail along the open side of the stairwell on this floor
+		cableRail(floors[f], L(STAIR_X0, floorTop(f), STAIR_Z0 + 0.2).Position, L(STAIR_X0, floorTop(f), HD - 1.2).Position)
+	end
 
 	for f = 1, Gym.FLOORS do
 		dressFloor(floors[f], L, f)
@@ -345,21 +375,21 @@ function Gym.Build(parent, plotId, plotCF)
 	end
 
 	-- rooftop sign (PlotService lifts it onto whichever roof is showing)
-	local sign = Geo.part(model, "Sign", Vector3.new(44, 7, 0.8), L(0, floorTop(1) + FH + 5, -HD + 1.2), Pal.Accent, M.SmoothPlastic, { Role = "Accent", CanCollide = false })
+	local sign = Geo.part(model, "Sign", Vector3.new(40, 7, 0.8), L(0, floorTop(1) + FH + 5, -HD + 1.2), Pal.Accent, M.SmoothPlastic, { Role = "Accent", CanCollide = false })
 	sign.CastShadow = false
 	sign:SetAttribute("FloorHeight", FH)
 
 	-- ================= ground-floor gameplay parts =================
-	local desk = Geo.part(model, "FrontDesk", Vector3.new(10, 3.4, 2.6), L(-24, FY + 1.7, -25), Pal.Accent, M.SmoothPlastic, { Role = "Accent" })
+	local desk = Geo.part(model, "FrontDesk", Vector3.new(10, 3.4, 2.6), L(-17, FY + 1.7, -30), Pal.Accent, M.SmoothPlastic, { Role = "Accent" })
 	Geo.part(floors[1], "DeskTop", Vector3.new(10.4, 0.2, 3), desk.CFrame * CFrame.new(0, 1.8, 0), Pal.White, M.Marble, { CanCollide = false })
 	local monitor = Geo.part(floors[1], "DeskMonitor", Vector3.new(1.4, 0.9, 0.1), desk.CFrame * CFrame.new(1.5, 2.45, 0.3) * CFrame.Angles(0, rad(180), 0), Pal.Black, M.SmoothPlastic, { CanCollide = false })
 	Geo.decorate(Geo.part(floors[1], "DeskScreen", Vector3.new(1.25, 0.75, 0.02), monitor.CFrame * CFrame.new(0, 0, -0.06), Pal.Screen, M.Neon))
-	Geo.decorate(Geo.part(model, "DeskSpawn", Vector3.new(1, 1, 1), L(-24, 3, -22.4), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
-	Geo.decorate(Geo.part(model, "PlotSpawn", Vector3.new(1, 1, 1), L(AX, 4, -26), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
+	Geo.decorate(Geo.part(model, "DeskSpawn", Vector3.new(1, 1, 1), L(-17, 3, -27.4), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
+	Geo.decorate(Geo.part(model, "PlotSpawn", Vector3.new(1, 1, 1), L(AX, 4, -30), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
 
 	-- owner's heavy bag ("Do a Rep" station)
-	local bagCF = L(16, FY + 4.6, -25)
-	Geo.decorate(Geo.part(floors[1], "BagChain", Vector3.new(0.1, FH - 9.6, 0.1), L(16, FY + (FH - SLAB + 8.6) / 2 + 0.5, -25), Pal.Steel, M.Metal))
+	local bagCF = L(17, FY + 4.6, -30)
+	Geo.decorate(Geo.part(floors[1], "BagChain", Vector3.new(0.1, FH - 9.6, 0.1), L(17, FY + (FH - SLAB + 8.6) / 2 + 0.5, -30), Pal.Steel, M.Metal))
 	local bag = Geo.part(model, "WorkoutStation", Vector3.new(5.6, 2.2, 2.2), bagCF * CFrame.Angles(0, 0, rad(90)), Color3.fromRGB(150, 30, 34), M.Leather)
 	bag.Shape = Enum.PartType.Cylinder
 	Geo.decorate(Geo.cyl(floors[1], "BagBand", 0.4, 2.25, bagCF * CFrame.new(0, 2.2, 0) * CFrame.Angles(0, 0, rad(90)), Pal.Black, M.Leather))

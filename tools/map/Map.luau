@@ -1,16 +1,13 @@
 --[[
-	Map — a compact, fair linear world.
+	Map — a compact linear world.
 
-	  - 8 gyms, 4 per side, packed along a short red-carpet boulevard
-	    (96 studs apart, front doors 25 studs from the carpet).
-	  - The conveyor runs along +Z. Influencers don't only come from one end:
-	    they drop out of chutes spread along the belt (one upstream of every
-	    pair of gyms, plus the main tunnel), taking turns, so no gym is far from
-	    where the talent shows up.
+	  - 8 slim gyms, 4 per side, packed along a short red-carpet boulevard
+	    (76 studs apart, front doors 20 studs from the carpet).
+	  - The conveyor runs along +Z out of a single drop tunnel; the map is kept
+	    short so every gym is close to it.
 	  - Realistic dressing: layered trees with tapered trunks, branches and
 	    multi-tone foliage, bushes, rocks, stone walls with hedges, curbed
-	    walkways. The ground becomes real Terrain grass at runtime
-	    (EnvironmentService), with animated grass blades and clouds.
+	    walkways, on a flat grass field.
 ]]
 
 local Geo = require("tools/map/Geo")
@@ -21,12 +18,12 @@ local Pal = Geo.Palette
 local M = Enum.Material
 local rad = math.rad
 
-Map.LOT_Z = { -144, -48, 48, 144 } -- 96 studs apart (20-stud gaps between gyms)
-Map.LOT_X = 72 -- gym center from the carpet center line (front door at 40)
-Map.HALF_X = 124
-Map.HALF_Z = 226
-Map.BELT_Z0 = -204
-Map.BELT_Z1 = 204
+Map.LOT_Z = { -114, -38, 38, 114 } -- 76 studs apart (20-stud gaps between gyms)
+Map.LOT_X = 76 -- gym center from the carpet center line (front door at 40)
+Map.HALF_X = 132
+Map.HALF_Z = 178
+Map.BELT_Z0 = -158
+Map.BELT_Z1 = 158
 Map.BELT_TOP = 1.0
 Map.BELT_WIDTH = 7
 Map.CARPET_HALF = 13
@@ -176,26 +173,6 @@ local function wallRun(parent, a, b)
 	Geo.part(parent, "Hedge", Vector3.new(3, 5, len), cf + Vector3.new(0, 6, 0), Color3.fromRGB(50, 80, 38), M.LeafyGrass)
 end
 
-local function chute(parent, z, label)
-	local m = Geo.model(parent, "DropChute")
-	local h = 16
-	for _, s in ipairs({ -1, 1 }) do
-		Geo.part(m, "ChuteLeg", Vector3.new(0.8, h, 0.8), CFrame.new(s * 6.5, h / 2, z), Pal.FrameDark, M.Metal)
-	end
-	Geo.part(m, "ChuteBeam", Vector3.new(14, 1.2, 1.6), CFrame.new(0, h, z), Pal.FrameDark, M.Metal)
-	-- the tube influencers drop out of
-	local tube = Geo.cyl(m, "Tube", 7, 5, CFrame.new(0, h - 3.5, z) * CFrame.Angles(0, 0, rad(90)), Color3.fromRGB(200, 215, 230), M.Glass, { Transparency = 0.5, CanCollide = false })
-	tube.CastShadow = false
-	Geo.decorate(Geo.cyl(m, "TubeRim", 0.4, 5.4, CFrame.new(0, h - 7, z) * CFrame.Angles(0, 0, rad(90)), Pal.Accent, M.Neon, { Role = "MapAccent" }))
-	local sign = Geo.part(m, "ChuteSign", Vector3.new(12, 2.2, 0.3), CFrame.new(0, h + 1.8, z), Pal.Black, M.SmoothPlastic, { CanCollide = false })
-	for _, face in ipairs({ Enum.NormalId.Front, Enum.NormalId.Back }) do
-		Geo.surfaceText(sign, face, label, { PPS = 20, Color = Color3.fromRGB(255, 255, 255) })
-	end
-	local point = Geo.decorate(Geo.part(m, "DropPoint", Vector3.new(1, 1, 1), CFrame.new(0, Map.BELT_TOP + 8.5, z), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
-	point:SetAttribute("DropPoint", true)
-	return m
-end
-
 local function tunnel(parent, name, z, dir, label)
 	local cf = CFrame.new(0, 0, z)
 	local m = Geo.model(parent, name)
@@ -220,9 +197,8 @@ function Map.Build(workspace)
 	local nature = Geo.folder(env, "Nature")
 	local hx, hz = Map.HALF_X, Map.HALF_Z
 
-	-- ground (Studio edit view only; replaced by Terrain grass when the server starts)
-	local ground = Geo.part(env, "Ground", Vector3.new(hx * 2 + 60, 4, hz * 2 + 60), CFrame.new(0, -2, 0), Color3.fromRGB(96, 122, 62), M.Grass)
-	ground:SetAttribute("EditOnly", true)
+	-- ground
+	Geo.part(env, "Ground", Vector3.new(hx * 2 + 60, 4, hz * 2 + 60), CFrame.new(0, -2, 0), Color3.fromRGB(88, 148, 66), M.Grass)
 
 	-- stone + hedge boundary with a gate at each end
 	local gateHalf = 20
@@ -261,10 +237,6 @@ function Map.Build(workspace)
 	Geo.decorate(Geo.part(belt, "BeltEnd", Vector3.new(1, 1, 1), CFrame.new(0, Map.BELT_TOP + 3, Map.BELT_Z1 - 4), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
 	local startPoint = Geo.decorate(Geo.part(belt, "DropPoint", Vector3.new(1, 1, 1), CFrame.new(0, Map.BELT_TOP + 3, Map.BELT_Z0 + 5), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
 	startPoint:SetAttribute("DropPoint", true)
-	-- chutes: one just upstream of every pair of gyms
-	for i, z in ipairs(Map.LOT_Z) do
-		chute(belt, z - 30, "DROP ZONE " .. i)
-	end
 
 	local chev = Geo.folder(belt, "Chevrons")
 	local spacing = 8

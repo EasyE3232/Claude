@@ -111,13 +111,13 @@ dof.InFocusRadius = 70
 dof.NearIntensity = 0
 dof.Parent = lighting
 
--- Terrain: animated grass blades (Decoration can only be set in the place file)
+-- Terrain only holds the clouds (the ground is the flat grass part)
 local terrain = workspace:FindFirstChildOfClass("Terrain")
 if not terrain then
 	terrain = Instance.new("Terrain")
 	terrain.Parent = workspace
 end
-terrain.Decoration = true
+terrain.Decoration = false
 pcall(function()
 	terrain.WaterColor = Color3.fromRGB(40, 90, 110)
 end)

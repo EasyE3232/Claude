@@ -14,7 +14,18 @@ local skip = mode == "gymfull" and {} or { Roof = true, Parapet = true, LEDStrip
 local list = {}
 local root = (mode == "gym" or mode == "gymfull") and ws.GymWarsMap.Plots.Plot5 or ws
 local inv = (mode == "gym" or mode == "gymfull") and root.Floor.CFrame:Inverse() or R.CFrame.new()
-for _, p in ipairs(root:GetDescendants()) do
+local all = root:GetDescendants()
+if mode ~= "map" then
+	local hidden = game:GetService("ServerStorage"):FindFirstChild("HiddenGymFloors")
+	local extra = hidden and hidden:FindFirstChild(root.Name)
+	if extra then
+		for _, d in ipairs(extra:GetDescendants()) do
+			if not d:IsDescendantOf(extra:FindFirstChild("Roof2") or extra) or d.Parent == nil then end
+			table.insert(all, d)
+		end
+	end
+end
+for _, p in ipairs(all) do
 	if p:IsA("BasePart") and p.ClassName ~= "Terrain" and p.Transparency < 0.95 and not ((mode == "gym" or mode == "gymfull") and skip[p.Name]) and not (mode == "map" and (p.Name == "Roof" or p.Name == "Parapet" or p.Name == "TreeLeaves" or p.Name == "Ground")) then
 		local c = inv * p.CFrame
 		local x, y, z, a, b, cc, d, e, f, g, h, i = c:GetComponents()
