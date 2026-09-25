@@ -58,41 +58,69 @@ end
 -- Lighting (Future = real-time lights + shadows, needed for a realistic gym)
 -- ----------------------------------------------------------------------
 lighting.Technology = Enum.Technology.Future
-lighting.ClockTime = 14.5
-lighting.Brightness = 2.6
-lighting.Ambient = Color3.fromRGB(62, 64, 72)
-lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 136)
+pcall(function()
+	lighting.LightingStyle = Enum.LightingStyle.Realistic -- naturalistic look (vs. stylized "Soft")
+end)
+pcall(function()
+	lighting.PrioritizeLightingQuality = true
+end)
+lighting.ClockTime = 15.3
+lighting.GeographicLatitude = 38
+lighting.Brightness = 3
+lighting.Ambient = Color3.fromRGB(40, 42, 48)
+lighting.OutdoorAmbient = Color3.fromRGB(118, 120, 128)
 lighting.EnvironmentDiffuseScale = 1
 lighting.EnvironmentSpecularScale = 1
 lighting.GlobalShadows = true
-lighting.ShadowSoftness = 0.25
+lighting.ShadowSoftness = 0.2
+lighting.ExposureCompensation = 0.1
 for _, child in ipairs(lighting:GetChildren()) do
 	child:Destroy()
 end
 local atmo = Instance.new("Atmosphere")
-atmo.Density = 0.28
-atmo.Offset = 0.2
-atmo.Haze = 1.2
-atmo.Glare = 0.4
-atmo.Color = Color3.fromRGB(199, 210, 225)
-atmo.Decay = Color3.fromRGB(110, 120, 140)
+atmo.Density = 0.3
+atmo.Offset = 0.25
+atmo.Haze = 1.4
+atmo.Glare = 0.3
+atmo.Color = Color3.fromRGB(198, 208, 222)
+atmo.Decay = Color3.fromRGB(106, 122, 146)
 atmo.Parent = lighting
 local sky = Instance.new("Sky")
+sky.SunAngularSize = 12
+sky.MoonAngularSize = 9
 sky.Parent = lighting
 local bloom = Instance.new("BloomEffect")
-bloom.Intensity = 0.55
-bloom.Size = 24
-bloom.Threshold = 1.4
+bloom.Intensity = 0.35
+bloom.Size = 20
+bloom.Threshold = 1.9
 bloom.Parent = lighting
 local cc = Instance.new("ColorCorrectionEffect")
-cc.Contrast = 0.08
-cc.Saturation = 0.06
-cc.Brightness = 0.01
+cc.Contrast = 0.06
+cc.Saturation = -0.04
+cc.Brightness = 0
+cc.TintColor = Color3.fromRGB(255, 252, 246)
 cc.Parent = lighting
 local rays = Instance.new("SunRaysEffect")
-rays.Intensity = 0.04
-rays.Spread = 0.6
+rays.Intensity = 0.03
+rays.Spread = 0.5
 rays.Parent = lighting
+local dof = Instance.new("DepthOfFieldEffect")
+dof.FarIntensity = 0.12
+dof.FocusDistance = 90
+dof.InFocusRadius = 70
+dof.NearIntensity = 0
+dof.Parent = lighting
+
+-- Terrain: animated grass blades (Decoration can only be set in the place file)
+local terrain = workspace:FindFirstChildOfClass("Terrain")
+if not terrain then
+	terrain = Instance.new("Terrain")
+	terrain.Parent = workspace
+end
+terrain.Decoration = true
+pcall(function()
+	terrain.WaterColor = Color3.fromRGB(40, 90, 110)
+end)
 
 -- ----------------------------------------------------------------------
 -- Scripts: mirror src/ into the place

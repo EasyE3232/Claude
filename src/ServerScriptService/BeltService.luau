@@ -3,8 +3,10 @@
 	The shared conveyor down the middle of the map. The BeltTrack part is a real
 	physics conveyor (its AssemblyLinearVelocity carries anything standing on
 	it), so influencers ride it as physical characters and replicate smoothly.
-	Spawns rarity-weighted influencers at BeltStart and removes whoever nobody
-	claimed once they reach BeltEnd. Claiming is InfluencerService's prompt.
+	Rarity-weighted influencers drop out of chutes spread along the belt (every
+	DropPoint part, taking turns in a shuffled order) so every gym gets
+	deliveries close to its door. Whoever nobody claims leaves at BeltEnd.
+	Claiming is InfluencerService's prompt.
 ]]
 
 local Players = game:GetService("Players")
@@ -22,6 +24,22 @@ local rng = Random.new()
 local spawnTimer = 0
 local track, startPart, endPart
 local direction = Vector3.new(0, 0, 1)
+local dropPoints = {}
+local dropQueue = {}
+
+-- Shuffled round-robin: each chute gets one drop per cycle (fair to every gym).
+local function nextDropPoint()
+	if #dropQueue == 0 then
+		for _, p in ipairs(dropPoints) do
+			table.insert(dropQueue, p)
+		end
+		for i = #dropQueue, 2, -1 do
+			local j = rng:NextInteger(1, i)
+			dropQueue[i], dropQueue[j] = dropQueue[j], dropQueue[i]
+		end
+	end
+	return table.remove(dropQueue)
+end
 
 function BeltService.Init()
 	local belt = workspace:WaitForChild("GymWarsMap"):WaitForChild("Belt")
@@ -31,6 +49,14 @@ function BeltService.Init()
 	direction = (endPart.Position - startPart.Position) * Vector3.new(1, 0, 1)
 	direction = direction.Unit
 	track.AssemblyLinearVelocity = direction * Constants.BELT.Speed
+	for _, d in ipairs(belt:GetDescendants()) do
+		if d:IsA("BasePart") and d:GetAttribute("DropPoint") then
+			table.insert(dropPoints, d)
+		end
+	end
+	if #dropPoints == 0 then
+		table.insert(dropPoints, startPart)
+	end
 	track:SetAttribute("Speed", Constants.BELT.Speed)
 	workspace:SetAttribute("BeltSpeed", Constants.BELT.Speed)
 
@@ -68,7 +94,8 @@ function BeltService.Step(dt)
 		spawnTimer = 0
 		if InfluencerService.CountOnBelt() < cfg.MaxOnBelt then
 			local rarityIdx = Constants.RollRarity(rng)
-			local spawnCF = CFrame.new(startPart.Position + Vector3.new(rng:NextNumber(-0.8, 0.8), 0, 0))
+			local drop = nextDropPoint()
+			local spawnCF = CFrame.new(drop.Position + Vector3.new(rng:NextNumber(-0.8, 0.8), 0, 0))
 			-- avatar creation can yield (asset loading), so don't block Heartbeat
 			task.spawn(function()
 				local rec = InfluencerService.Spawn(rarityIdx, spawnCF)

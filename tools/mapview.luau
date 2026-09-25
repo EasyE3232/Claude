@@ -15,7 +15,7 @@ local list = {}
 local root = (mode == "gym" or mode == "gymfull") and ws.GymWarsMap.Plots.Plot5 or ws
 local inv = (mode == "gym" or mode == "gymfull") and root.Floor.CFrame:Inverse() or R.CFrame.new()
 for _, p in ipairs(root:GetDescendants()) do
-	if p:IsA("BasePart") and p.Transparency < 0.95 and not ((mode == "gym" or mode == "gymfull") and skip[p.Name]) and not (mode == "map" and (p.Name == "Roof" or p.Name == "Parapet" or p.Name == "TreeLeaves" or p.Name == "Ground")) then
+	if p:IsA("BasePart") and p.ClassName ~= "Terrain" and p.Transparency < 0.95 and not ((mode == "gym" or mode == "gymfull") and skip[p.Name]) and not (mode == "map" and (p.Name == "Roof" or p.Name == "Parapet" or p.Name == "TreeLeaves" or p.Name == "Ground")) then
 		local c = inv * p.CFrame
 		local x, y, z, a, b, cc, d, e, f, g, h, i = c:GetComponents()
 		table.insert(list, { n = p.Name, tag = "eq", cf = { x, y, z, a, b, cc, d, e, f, g, h, i }, s = { p.Size.X, p.Size.Y, p.Size.Z },

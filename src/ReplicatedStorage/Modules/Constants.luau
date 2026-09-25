@@ -13,7 +13,7 @@ Constants.DATASTORE_NAME = "GymWars_v1"
 Constants.AUTOSAVE_INTERVAL = 60 -- seconds
 
 -- ======================================================================
--- MAP  (linear map: 5 gyms on each side of a long red-carpet conveyor)
+-- MAP  (compact linear map: 4 gyms on each side of a red-carpet conveyor)
 -- ======================================================================
 Constants.PLOT_COUNT = 8
 Constants.FLOOR_COUNT = 3 -- every gym grows up to 3 stories
@@ -24,9 +24,9 @@ Constants.RACK_SLOT_MAX = 33 -- machines per gym (3 of each): 12 + 12 + 9 across
 -- Start/end points come from the BeltStart / BeltEnd parts in the map.
 -- ======================================================================
 Constants.BELT = {
-	SpawnInterval = 3.5, -- seconds between spawns
-	MaxOnBelt = 26, -- cap on how many ride the belt at once
-	Speed = 8, -- studs per second (the belt part's conveyor velocity)
+	SpawnInterval = 3.5, -- seconds between spawns (each one drops from the next chute in turn)
+	MaxOnBelt = 20, -- cap on how many ride the belt at once
+	Speed = 6, -- studs per second (the belt part's conveyor velocity)
 	ClaimDistance = 11, -- ProximityPrompt activation range
 	ClaimHold = 0.3, -- seconds to hold the prompt
 	DroppedDespawn = 60, -- seconds a dropped, unowned influencer waits before leaving

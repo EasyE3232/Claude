@@ -17,11 +17,13 @@ local WorkoutService = require(SSS.WorkoutService)
 local ShopService = require(SSS.ShopService)
 local DefenseService = require(SSS.DefenseService)
 local NpcService = require(SSS.NpcService)
+local EnvironmentService = require(SSS.EnvironmentService)
 local Notify = require(SSS.Notify)
 
 -- ----------------------------------------------------------------------
 -- Init order matters: plots first (everything hangs off them)
 -- ----------------------------------------------------------------------
+EnvironmentService.Init()
 NpcService.Init()
 PlotService.Init()
 InfluencerService.Init()
