@@ -198,6 +198,7 @@ function BeltService.Init()
 end
 
 local checkAccum = 0
+local lastPreviewEvent = -math.huge
 function BeltService.Step(dt)
 	local cfg = Constants.BELT
 	-- keep the conveyor running (in case something reset it)
@@ -236,7 +237,11 @@ function BeltService.Step(dt)
 			task.spawn(function()
 				local rec = InfluencerService.Spawn(char, CFrame.new(pos))
 				if rec and rec.Model then
-					announce(char, rarity, rec.Model)
+					local now = os.clock()
+					if not Characters.PREVIEW or now - lastPreviewEvent >= Characters.PREVIEW_EVENT_COOLDOWN then
+						lastPreviewEvent = now
+						announce(char, rarity, rec.Model)
+					end
 				end
 			end)
 		end

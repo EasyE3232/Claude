@@ -102,6 +102,14 @@ Characters.RARITIES = {
 -- ----------------------------------------------------------------------
 -- MUTATIONS (structure only — the mutation economy isn't live yet)
 -- ----------------------------------------------------------------------
+-- PREVIEW: set to a list of character Names to make the conveyor spawn ONLY
+-- those, in turn (for looking at new designs). Set to nil for normal odds.
+Characters.PREVIEW = { "JayCuttler", "RonnieCurlman", "ArnieIronberg" }
+-- while previewing, big spawn events (banner, lights, gold world) fire at
+-- most this often so they don't stack every few seconds
+Characters.PREVIEW_EVENT_COOLDOWN = 25
+local previewIndex = 0
+
 Characters.MUTATIONS = {
 	None = { DisplayName = "", Multiplier = 1 },
 	-- Gold = { DisplayName = "GOLD", Multiplier = 1.5, Color = C(255, 210, 60) },
@@ -553,6 +561,13 @@ end
 
 -- Roll the next conveyor character: rarity by Odds, then character by SpawnWeight.
 function Characters.Roll(rng)
+	if Characters.PREVIEW and #Characters.PREVIEW > 0 then
+		previewIndex = previewIndex % #Characters.PREVIEW + 1
+		local c = Characters.BY_NAME[Characters.PREVIEW[previewIndex]]
+		if c then
+			return c
+		end
+	end
 	local candidates = {}
 	for _, r in ipairs(Characters.RARITIES) do
 		if #Characters.BY_RARITY[r.Id] > 0 then
