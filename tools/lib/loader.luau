@@ -29,6 +29,7 @@ function RandomShim:NextInteger(a, b)
 end
 
 local requireAny
+local GAME = nil -- optional fake `game` for offline harnesses
 
 local function makeEnv(dir)
 	local env = {}
@@ -44,7 +45,8 @@ local function makeEnv(dir)
 		}),
 	}
 	env.require = requireAny
-	env.game = env.game or nil
+	env.game = GAME
+	env.typeof = typeof
 	return env
 end
 
@@ -68,4 +70,13 @@ function requireAny(ref)
 	return result
 end
 
-return { require = requireAny, roblox = roblox }
+return {
+	require = requireAny,
+	roblox = roblox,
+	setGame = function(g)
+		GAME = g
+	end,
+	preload = function(ref, value)
+		cache[ROOT .. "/" .. ref .. ".luau"] = value
+	end,
+}

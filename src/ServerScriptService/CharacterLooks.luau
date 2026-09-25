@@ -120,11 +120,11 @@ local function paint(model, look)
 		color({ "LeftUpperLeg", "RightUpperLeg", "LeftLowerLeg", "RightLowerLeg" }, bottom.Color)
 	elseif bs == "Shorts" or bs == "LongShorts" then
 		color({ "LeftUpperLeg", "RightUpperLeg" }, bottom.Color)
-		if look.Socks then
+		if typeof(look.Socks) == "Color3" then
 			color({ "LeftLowerLeg", "RightLowerLeg" }, look.Socks)
 		end
 	elseif bs == "PosingShorts" then
-		if look.Socks then
+		if typeof(look.Socks) == "Color3" then
 			color({ "LeftLowerLeg", "RightLowerLeg" }, look.Socks)
 		end
 	end
@@ -160,6 +160,21 @@ local function cloth(folder, P, top, bottom, look)
 			elseif bs == "Sweatpants" or bs == "FlowingPants" then
 				local k = bs == "FlowingPants" and 1.45 or 1.18
 				shell(folder, leg, Vector3.new(k, 1.02, k), Vector3.new(0, 0, 0), bottom.Color, { Name = "Cloth" })
+			end
+		end
+	end
+	if bottom.Trim and (bs == "Shorts" or bs == "PosingShorts") then
+		-- contrast piping around the hem and up the outer seam
+		for _, side in ipairs({ "Left", "Right" }) do
+			local leg = P[side .. "UpperLeg"]
+			if leg then
+				local s = side == "Left" and -1 or 1
+				local hemY = bs == "PosingShorts" and 0.22 or -0.44
+				-- the quad shell tapers toward the knee; the hem ring hugs that taper
+				local L = (look.Build and look.Build.Legs) or 0
+				local k = bs == "PosingShorts" and 0.5 or 0.3
+				shell(folder, leg, Vector3.new(1.08 + k * L, 0.07, 1.1 + k * L), Vector3.new(s * 0.04 * L, hemY, -0.04 * L), bottom.Trim, { Name = "Trim", Round = false })
+				shell(folder, leg, Vector3.new(0.06, 0.5 - hemY, 0.3), Vector3.new(s * (0.56 + 0.32 * L), 0.25 + hemY / 2, 0), bottom.Trim, { Name = "Trim", Round = false })
 			end
 		end
 	end
@@ -324,6 +339,62 @@ local function face(folder, head, look)
 end
 
 -- ----------------------------------------------------------------------
+-- Footwear, socks and training gear (belt, knee sleeves, wraps)
+-- ----------------------------------------------------------------------
+local function gear(folder, P, look, build)
+	local legs = build.Legs or 0
+	local socks = look.Socks
+	if type(socks) == "table" then
+		local h = socks.Height or 0.5
+		for _, n in ipairs({ "LeftLowerLeg", "RightLowerLeg" }) do
+			local ll = P[n]
+			if ll then
+				-- slightly bulkier than the calf so the sock reads as fabric
+				shell(folder, ll, Vector3.new(1.12 + 0.3 * legs, h, 1.14 + 0.4 * legs), Vector3.new(0, -0.5 + h / 2, 0.04 * legs), socks.Color, { Name = "Sock", Round = false })
+				for i, stripe in ipairs(socks.Stripes or {}) do
+					local y = -0.5 + h - 0.08 - (i - 1) * 0.1
+					shell(folder, ll, Vector3.new(1.15 + 0.3 * legs, 0.05, 1.17 + 0.4 * legs), Vector3.new(0, y, 0.04 * legs), stripe, { Name = "SockStripe", Round = false })
+				end
+			end
+		end
+	end
+	local shoe = look.ShoeStyle
+	if shoe == "HighTop" or shoe == "Boots" then
+		local c = look.Shoes or Color3.fromRGB(40, 40, 44)
+		for _, side in ipairs({ "Left", "Right" }) do
+			local foot, ll = P[side .. "Foot"], P[side .. "LowerLeg"]
+			if foot then
+				shell(folder, foot, Vector3.new(1.12, 1.15, 1.1), Vector3.new(0, 0.04, -0.02), c, { Name = "Shoe", Round = false })
+				shell(folder, foot, Vector3.new(1.16, 0.22, 1.14), Vector3.new(0, -0.42, -0.02), shoe == "Boots" and Color3.fromRGB(20, 20, 22) or Color3.fromRGB(235, 235, 235), { Name = "Sole", Round = false })
+			end
+			if ll then
+				local h = shoe == "Boots" and 0.34 or 0.2
+				shell(folder, ll, Vector3.new(1.2 + 0.3 * legs, h, 1.2 + 0.4 * legs), Vector3.new(0, -0.5 + h / 2, 0.04 * legs), c, { Name = "ShoeCollar", Round = false })
+			end
+		end
+	end
+	for _, item in ipairs(look.Gear or {}) do
+		if item == "LiftingBelt" and P.LowerTorso then
+			local lt = P.LowerTorso
+			shell(folder, lt, Vector3.new(1.12, 0.42, 1.18), Vector3.new(0, 0.28, 0), Color3.fromRGB(28, 26, 26), { Name = "Belt", Round = false, Material = Enum.Material.Leather })
+			shell(folder, lt, Vector3.new(0.3, 0.3, 0.06), Vector3.new(0, 0.28, -0.6), Color3.fromRGB(190, 190, 196), { Name = "Buckle", Round = false, Material = Enum.Material.Metal })
+			for _, x in ipairs({ -0.36, 0.36 }) do
+				shell(folder, lt, Vector3.new(0.06, 0.06, 0.02), Vector3.new(x, 0.28, -0.6), Color3.fromRGB(170, 170, 176), { Name = "Rivet", Material = Enum.Material.Metal })
+			end
+		elseif item == "KneeSleeves" then
+			local band = look.SleeveBand or Color3.fromRGB(190, 30, 36)
+			for _, n in ipairs({ "LeftLowerLeg", "RightLowerLeg" }) do
+				local ll = P[n]
+				if ll then
+					shell(folder, ll, Vector3.new(1.24 + 0.3 * legs, 0.34, 1.26 + 0.4 * legs), Vector3.new(0, 0.34, 0.04 * legs), Color3.fromRGB(22, 22, 24), { Name = "KneeSleeve", Round = false, Material = Enum.Material.Rubber })
+					shell(folder, ll, Vector3.new(1.27 + 0.3 * legs, 0.06, 1.29 + 0.4 * legs), Vector3.new(0, 0.2, 0.04 * legs), band, { Name = "SleeveBand", Round = false })
+				end
+			end
+		end
+	end
+end
+
+-- ----------------------------------------------------------------------
 -- Props (hidden while training on a machine)
 -- ----------------------------------------------------------------------
 local function props(folder, P, look)
@@ -344,7 +415,7 @@ local function props(folder, P, look)
 			attach(folder, P.RightHand, Vector3.new(0.5, 0.34, 0.3), Vector3.new(0, 1.25, 0), Color3.fromRGB(24, 24, 28), { Name = "Camera", Round = false, Prop = true })
 			attach(folder, P.RightHand, Vector3.new(0.18, 0.18, 0.12), Vector3.new(0, 1.25, -0.2), Color3.fromRGB(60, 90, 140), { Name = "Lens", Prop = true })
 		elseif (prop == "WristStraps" or prop == "WristWraps") then
-			local c = prop == "WristWraps" and Color3.fromRGB(200, 40, 40) or Color3.fromRGB(30, 30, 34)
+			local c = look.WrapColor or (prop == "WristWraps" and Color3.fromRGB(200, 40, 40) or Color3.fromRGB(30, 30, 34))
 			for _, n in ipairs({ "LeftLowerArm", "RightLowerArm" }) do
 				local la = P[n]
 				if la then
@@ -524,6 +595,7 @@ function CharacterLooks.Build(char, opts)
 	local P, top, bottom = paint(model, look)
 	cloth(folder, P, top, bottom, look)
 	bulk(folder, P, build)
+	gear(folder, P, look, build)
 	if P.Head then
 		local capped = false
 		for _, pr in ipairs(look.Props or {}) do

@@ -21,6 +21,7 @@ local Modules = RS:WaitForChild("Modules")
 local GymModules = Modules:WaitForChild("Gym")
 local Constants = require(Modules:WaitForChild("Constants"))
 local RigSolver = require(GymModules:WaitForChild("RigSolver"))
+local Poses = require(GymModules:WaitForChild("Poses"))
 local Exercises = require(GymModules:WaitForChild("Exercises"))
 local Specs = require(GymModules:WaitForChild("StationSpecs"))
 local Remotes = RS:WaitForChild("Remotes")
@@ -275,7 +276,7 @@ end
 -- few seconds while riding the conveyor, layered over their idle animation)
 -- ----------------------------------------------------------------------
 local POSE_PERIOD, POSE_HOLD = 9, 3.2
-local POSE_JOINTS = { "LeftShoulder", "LeftElbow", "LeftWrist", "RightShoulder", "RightElbow", "RightWrist", "Waist", "Neck" }
+local POSE_JOINTS = Poses.JOINTS
 local beltRigs = {}
 
 local function beltPose(model, now, camPos)
@@ -304,42 +305,9 @@ local function beltPose(model, now, camPos)
 	end
 	local poses = string.split(model:GetAttribute("Poses"), ",")
 	local name = poses[(cycle % #poses) + 1]
-	local d = rig.Dims
-	local k = d.Scale
-
 	rig:reset()
 	rig:setRootCFrame(nil)
-	if name == "MostMuscular" then
-		rig:set("Waist", CFrame.Angles(math.rad(-14), 0, 0))
-	elseif name == "Vacuum" then
-		rig:set("Waist", CFrame.Angles(math.rad(5), 0, 0))
-	elseif name == "LatSpread" then
-		rig:set("Waist", CFrame.Angles(math.rad(3), 0, 0))
-	end
-	local ut = rig:world("UpperTorso")
-	local right, up, fwd = ut.RightVector, ut.UpVector, ut.LookVector
-	local head = rig:world("Head").Position
-	local lt = rig:world("LowerTorso")
-	for _, side in ipairs({ "Left", "Right" }) do
-		local sgn = side == "Left" and -1 or 1
-		local S = rig:pivot(side .. "Shoulder")
-		local target, pole
-		if name == "DoubleBiceps" then
-			target = S + right * sgn * (1.15 * k) + up * (1.05 * k) - fwd * (0.1 * k)
-			pole = S + right * sgn * (3 * k) - up * (0.4 * k)
-		elseif name == "Vacuum" then
-			target = head + right * sgn * (0.45 * k) - fwd * (0.55 * k) + up * (0.15 * k)
-			pole = S + right * sgn * (2.5 * k) + up * (1.6 * k)
-		elseif name == "MostMuscular" then
-			target = ut.Position + fwd * (0.95 * k) - up * (0.75 * k) + right * sgn * (0.25 * k)
-			pole = S + right * sgn * (2.6 * k) + fwd * (0.4 * k)
-		else -- LatSpread: fists on the waist, elbows flared
-			target = lt * Vector3.new(sgn * (d.ShoulderHalfWidth - 0.25 * k), 0.3 * k, 0.12 * k)
-			pole = S + right * sgn * (2.6 * k) - fwd * (1.1 * k)
-		end
-		rig:armIK(side, target, pole)
-	end
-	rig:set("Neck", CFrame.Angles(name == "MostMuscular" and math.rad(10) or 0, 0, 0))
+	Poses.Apply(rig, name)
 	for _, jn in ipairs(POSE_JOINTS) do
 		local j = rig.J[jn]
 		if j then

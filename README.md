@@ -86,6 +86,8 @@ Motion is procedural and runs on every client, with no uploaded animation assets
 
 `tools/posecheck.luau` + `tools/render_pose.py` render any exercise offline
 (side, front, top and 3/4 views) so you can tune poses without Studio.
+`tools/lookcheck.luau <CharacterName>...` builds character looks offline
+(block-rig stand-in) into `build/looks.json` for the same renderer.
 
 ## Tuning
 

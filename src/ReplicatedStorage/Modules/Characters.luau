@@ -118,10 +118,13 @@ Characters.MUTATIONS = {
 --               Pompadour Floppy LongCurly SweptBack Spiky Buzz Tied Bald
 --   Beard       nil | "Stubble" | "Full" | "Large";   Mustache = true
 --   Top         { Style, Color }  Style: Tee Oversized Tank Stringer Hoodie SleevelessHoodie Sleeveless
---   Bottom      { Style, Color }  Style: Joggers Sweatpants Shorts LongShorts PosingShorts FlowingPants
---   Socks       Color3 (high socks, shows with shorts)
---   Shoes       Color3
+--   Bottom      { Style, Color, Trim? }  Style: Joggers Sweatpants Shorts LongShorts PosingShorts FlowingPants
+--               Trim = Color3 adds hem + side-seam piping on shorts
+--   Socks       Color3 (whole shin) | { Color, Height (0..1 of shin), Stripes = { Color3, ... } }
+--   Shoes       Color3;   ShoeStyle = nil | "HighTop" | "Boots"
+--   Gear        { "LiftingBelt" | "KneeSleeves" }  (worn while training too; SleeveBand = Color3)
 --   Props       { "Duffel" | "WaterJug" | "Clipboard" | "Tripod" | "WristStraps" | "WristWraps" | "Cap" }
+--   WrapColor   Color3 (wrist wraps / straps)
 --   CapColor    Color3 (when Props has "Cap")
 --   Build       { Height, Width, Depth, Shoulders, Arms, Forearms, Chest, Traps, Legs }  (0 = normal)
 -- Special:
@@ -130,6 +133,7 @@ Characters.MUTATIONS = {
 --   IdleSpeed = n          energetic idle
 --   Emote = "Point"        favorite belt emote
 --   Poses = { ... }        belt posing idles: DoubleBiceps Vacuum MostMuscular LatSpread
+--                          CrossedArms SideChest Point
 --   SpawnFx = "Cinematic" | "Milestone" | "GoldSpotlight" | "HeavyLanding" | "GoldenEra"
 --   Tags = { "Meta", "Value", "Collector", "Flex", "Jackpot", ... } (for UI / future filters)
 -- ----------------------------------------------------------------------
@@ -451,29 +455,40 @@ Characters.LIST = {
 	},
 
 	-- ================================ G.O.A.T. ==============================
+	-- Looks below follow the approved character sheets (sheet build
+	-- multipliers are converted to muscle-shell sizes: 1.0 = no extra bulk).
 	{
 		Name = "JayCuttler", DisplayName = "Jay Cuttler", InspiredBy = "Jay Cutler",
 		Rarity = "GOAT", Price = 12e12, IncomePerSecond = 3.1e9, SpawnWeight = 65, ModelName = "JayCuttler",
-		Look = { Skin = SKIN.Light, Hair = { Style = "Spiky", Color = HAIR.Blond },
-			Top = { Style = "Tank", Color = C(40, 40, 46) }, Bottom = { Style = "Shorts", Color = C(30, 30, 40) },
-			Shoes = BLACK, Build = { Width = 1.35, Depth = 1.3, Shoulders = 1.05, Chest = 0.8, Arms = 0.8, Legs = 1.0 } },
-		SpawnFx = "GoldSpotlight", Poses = { "LatSpread", "DoubleBiceps" },
+		Look = { Skin = C(217, 165, 122), Hair = { Style = "Spiky", Color = C(184, 155, 122) },
+			Top = { Style = "Tank", Color = C(26, 26, 26) }, Bottom = { Style = "Shorts", Color = C(43, 43, 43), Trim = C(245, 245, 245) },
+			Socks = { Color = C(245, 245, 245), Height = 0.55 }, Shoes = C(255, 255, 255), ShoeStyle = "HighTop",
+			-- sheet: Height 1.05, Shoulders 1.4, Arms 1.35, Legs 1.25
+			Build = { Height = 1.05, Width = 1.35, Depth = 1.3, Shoulders = 1.05, Chest = 0.8, Arms = 0.9, Traps = 0.5, Legs = 0.8 } },
+		SpawnFx = "GoldSpotlight", Poses = { "DoubleBiceps", "SideChest", "CrossedArms", "LatSpread" },
 	},
 	{
 		Name = "RonnieCurlman", DisplayName = "Ronnie Curlman", InspiredBy = "Ronnie Coleman",
 		Rarity = "GOAT", Price = 20e12, IncomePerSecond = 3.35e9, SpawnWeight = 27, ModelName = "RonnieCurlman",
-		Look = { Skin = SKIN.Dark, Hair = { Style = "Bald", Color = HAIR.Black },
-			Top = { Style = "Tank", Color = C(20, 20, 24) }, Bottom = { Style = "Shorts", Color = BLACK },
-			Shoes = BLACK, Build = { Height = 1.18, Width = 1.5, Depth = 1.45, Shoulders = 1.25, Arms = 1.25, Chest = 1.0, Traps = 1.0, Legs = 1.2 } },
-		SpawnFx = "HeavyLanding", Poses = { "MostMuscular", "DoubleBiceps" }, Tags = { "Biggest" },
+		Look = { Skin = C(107, 63, 42), Hair = { Style = "Bald", Color = HAIR.Black },
+			Top = { Style = "Tank", Color = C(26, 26, 26) }, Bottom = { Style = "Shorts", Color = C(31, 31, 31) },
+			Shoes = C(17, 17, 17), ShoeStyle = "Boots",
+			Gear = { "LiftingBelt", "KneeSleeves" }, SleeveBand = C(178, 34, 34),
+			Props = { "WristWraps" }, WrapColor = C(26, 26, 26),
+			-- sheet: Height 1.1, Shoulders 1.5, Arms 1.5, Legs 1.4 (largest in the game)
+			Build = { Height = 1.1, Width = 1.5, Depth = 1.45, Shoulders = 1.3, Arms = 1.3, Chest = 1.0, Traps = 1.0, Legs = 1.28 } },
+		SpawnFx = "HeavyLanding", Poses = { "DoubleBiceps", "MostMuscular", "SideChest" }, Tags = { "Biggest" },
 	},
 	{
 		Name = "ArnieIronberg", DisplayName = "Arnie Ironberg", InspiredBy = "Arnold Schwarzenegger",
 		Rarity = "GOAT", Price = 35e12, IncomePerSecond = 3.5e9, SpawnWeight = 8, ModelName = "ArnieIronberg",
-		Look = { Skin = SKIN.Tan, Hair = { Style = "SweptBack", Color = HAIR.DarkBrown },
-			Top = { Style = "Tank", Color = C(184, 152, 96) }, Bottom = { Style = "Shorts", Color = C(30, 30, 40) },
-			Shoes = C(60, 44, 32), Build = { Height = 1.1, Width = 1.3, Chest = 1.2, Arms = 1.0, Shoulders = 0.85 } },
-		SpawnFx = "GoldenEra", Poses = { "DoubleBiceps", "MostMuscular" }, Tags = { "Rarest", "Prestige" },
+		Look = { Skin = C(210, 161, 121), Hair = { Style = "SweptBack", Color = C(59, 43, 32) },
+			Top = { Style = "Tank", Color = C(178, 34, 34) }, Bottom = { Style = "Shorts", Color = C(31, 31, 31) },
+			Socks = { Color = C(245, 245, 245), Height = 0.5, Stripes = { C(178, 34, 34), C(178, 34, 34) } },
+			Shoes = C(255, 255, 255),
+			-- sheet: Height 1.1, Shoulders 1.45, Arms 1.4, Legs 1.3
+			Build = { Height = 1.1, Width = 1.4, Depth = 1.3, Shoulders = 1.17, Arms = 1.04, Chest = 1.2, Traps = 0.6, Legs = 0.96 } },
+		SpawnFx = "GoldenEra", Poses = { "DoubleBiceps", "SideChest", "Point" }, Tags = { "Rarest", "Prestige" },
 	},
 }
 

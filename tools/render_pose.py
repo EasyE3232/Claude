@@ -32,6 +32,16 @@ def part_faces(p):
         faces.append(b)
         for k in range(n):
             faces.append([a[k], a[(k + 1) % n], b[(k + 1) % n], b[k]])
+    elif "Ellipsoid" in shape:
+        nu, nv = 10, 6
+        pts = [[np.array([math.cos(2 * math.pi * i / nu) * math.sin(math.pi * j / nv) * sx,
+                          math.cos(math.pi * j / nv) * sy,
+                          math.sin(2 * math.pi * i / nu) * math.sin(math.pi * j / nv) * sz])
+                for i in range(nu)] for j in range(nv + 1)]
+        for j in range(nv):
+            for i in range(nu):
+                i2 = (i + 1) % nu
+                faces.append([pts[j][i], pts[j][i2], pts[j + 1][i2], pts[j + 1][i]][::-1])
     else:
         if "Ball" in shape:
             sx = sy = sz = min(sx, sy, sz)
