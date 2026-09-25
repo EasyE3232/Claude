@@ -45,7 +45,7 @@ local function followSpotlight(model, color, duration)
 	spot.Face = Enum.NormalId.Bottom
 	spot.Angle = 38
 	spot.Range = 45
-	spot.Brightness = 10
+	spot.Brightness = 3
 	spot.Color = color
 	spot.Shadows = true
 	spot.Parent = rig
@@ -57,7 +57,7 @@ local function followSpotlight(model, color, duration)
 	beam.CanTouch = false
 	beam.Material = Enum.Material.Neon
 	beam.Color = color
-	beam.Transparency = 0.82
+	beam.Transparency = 0.9
 	beam.Shape = Enum.PartType.Cylinder
 	beam.Size = Vector3.new(30, 7, 7)
 	beam.CastShadow = false
@@ -76,8 +76,8 @@ local function followSpotlight(model, color, duration)
 		rig.CFrame = CFrame.new(p + Vector3.new(0, 30, 0))
 		beam.CFrame = CFrame.new(p + Vector3.new(0, 15, 0)) * CFrame.Angles(0, 0, math.rad(90))
 		local fade = math.clamp((duration - (os.clock() - t0)) / 1.5, 0, 1)
-		beam.Transparency = 1 - 0.18 * fade
-		spot.Brightness = 10 * fade
+		beam.Transparency = 1 - 0.1 * fade
+		spot.Brightness = 3 * fade
 	end)
 end
 
@@ -90,12 +90,12 @@ local function goldBurst(model, duration)
 	att.Parent = root
 	local pe = Instance.new("ParticleEmitter")
 	pe.Color = ColorSequence.new(Color3.fromRGB(255, 236, 140), Color3.fromRGB(255, 180, 20))
-	pe.LightEmission = 1
-	pe.Rate = 80
+	pe.LightEmission = 0.6
+	pe.Rate = 25
 	pe.Lifetime = NumberRange.new(1.2, 2.2)
 	pe.Speed = NumberRange.new(4, 10)
 	pe.SpreadAngle = Vector2.new(180, 180)
-	pe.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+	pe.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.3), NumberSequenceKeypoint.new(1, 0) })
 	pe.Acceleration = Vector3.new(0, 3, 0)
 	pe.Parent = att
 	task.delay(duration, function()

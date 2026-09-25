@@ -131,7 +131,7 @@ local function paint(model, look)
 	return P, top, bottom
 end
 
-local function cloth(folder, P, top, bottom, look)
+local function cloth(folder, P, top, bottom, look, shape)
 	local ts, bs = top.Style, bottom.Style
 	local ut = P.UpperTorso
 	if ut then
@@ -171,7 +171,7 @@ local function cloth(folder, P, top, bottom, look)
 				local s = side == "Left" and -1 or 1
 				local hemY = bs == "PosingShorts" and 0.22 or -0.44
 				-- the quad shell tapers toward the knee; the hem ring hugs that taper
-				local L = (look.Build and look.Build.Legs) or 0
+				local L = shape.Legs or 0
 				local k = bs == "PosingShorts" and 0.5 or 0.3
 				shell(folder, leg, Vector3.new(1.08 + k * L, 0.07, 1.1 + k * L), Vector3.new(s * 0.04 * L, hemY, -0.04 * L), bottom.Trim, { Name = "Trim", Round = false })
 				shell(folder, leg, Vector3.new(0.06, 0.5 - hemY, 0.3), Vector3.new(s * (0.56 + 0.32 * L), 0.25 + hemY / 2, 0), bottom.Trim, { Name = "Trim", Round = false })
@@ -194,6 +194,20 @@ end
 -- ----------------------------------------------------------------------
 -- Muscle shaping
 -- ----------------------------------------------------------------------
+-- Build values are authored on a 0..~1.3 scale; shells use a damped version
+-- so even the biggest bodies read as muscle rather than balloons.
+local BULK = 0.5
+local function shapeOf(build)
+	local out = {}
+	for k, v in pairs(build) do
+		out[k] = v
+	end
+	for _, k in ipairs({ "Shoulders", "Arms", "Forearms", "Chest", "Traps", "Legs" }) do
+		out[k] = (build[k] or 0) * BULK
+	end
+	return out
+end
+
 local function bulk(folder, P, build)
 	local sh, arms, fore = build.Shoulders or 0, build.Arms or 0, build.Forearms or 0
 	local chest, traps, legs = build.Chest or 0, build.Traps or 0, build.Legs or 0
@@ -350,10 +364,10 @@ local function gear(folder, P, look, build)
 			local ll = P[n]
 			if ll then
 				-- slightly bulkier than the calf so the sock reads as fabric
-				shell(folder, ll, Vector3.new(1.12 + 0.3 * legs, h, 1.14 + 0.4 * legs), Vector3.new(0, -0.5 + h / 2, 0.04 * legs), socks.Color, { Name = "Sock", Round = false })
+				shell(folder, ll, Vector3.new(1.05 + 0.3 * legs, h, 1.06 + 0.4 * legs), Vector3.new(0, -0.5 + h / 2, 0.04 * legs), socks.Color, { Name = "Sock", Round = false })
 				for i, stripe in ipairs(socks.Stripes or {}) do
 					local y = -0.5 + h - 0.08 - (i - 1) * 0.1
-					shell(folder, ll, Vector3.new(1.15 + 0.3 * legs, 0.05, 1.17 + 0.4 * legs), Vector3.new(0, y, 0.04 * legs), stripe, { Name = "SockStripe", Round = false })
+					shell(folder, ll, Vector3.new(1.07 + 0.3 * legs, 0.05, 1.08 + 0.4 * legs), Vector3.new(0, y, 0.04 * legs), stripe, { Name = "SockStripe", Round = false })
 				end
 			end
 		end
@@ -369,25 +383,25 @@ local function gear(folder, P, look, build)
 			end
 			if ll then
 				local h = shoe == "Boots" and 0.34 or 0.2
-				shell(folder, ll, Vector3.new(1.2 + 0.3 * legs, h, 1.2 + 0.4 * legs), Vector3.new(0, -0.5 + h / 2, 0.04 * legs), c, { Name = "ShoeCollar", Round = false })
+				shell(folder, ll, Vector3.new(1.08 + 0.3 * legs, h, 1.1 + 0.4 * legs), Vector3.new(0, -0.5 + h / 2, 0.04 * legs), c, { Name = "ShoeCollar", Round = false })
 			end
 		end
 	end
 	for _, item in ipairs(look.Gear or {}) do
 		if item == "LiftingBelt" and P.LowerTorso then
 			local lt = P.LowerTorso
-			shell(folder, lt, Vector3.new(1.12, 0.42, 1.18), Vector3.new(0, 0.28, 0), Color3.fromRGB(28, 26, 26), { Name = "Belt", Round = false, Material = Enum.Material.Leather })
-			shell(folder, lt, Vector3.new(0.3, 0.3, 0.06), Vector3.new(0, 0.28, -0.6), Color3.fromRGB(190, 190, 196), { Name = "Buckle", Round = false, Material = Enum.Material.Metal })
+			shell(folder, lt, Vector3.new(1.08, 0.42, 1.12), Vector3.new(0, 0.28, 0), Color3.fromRGB(28, 26, 26), { Name = "Belt", Round = false, Material = Enum.Material.Leather })
+			shell(folder, lt, Vector3.new(0.3, 0.3, 0.06), Vector3.new(0, 0.28, -0.57), Color3.fromRGB(190, 190, 196), { Name = "Buckle", Round = false, Material = Enum.Material.Metal })
 			for _, x in ipairs({ -0.36, 0.36 }) do
-				shell(folder, lt, Vector3.new(0.06, 0.06, 0.02), Vector3.new(x, 0.28, -0.6), Color3.fromRGB(170, 170, 176), { Name = "Rivet", Material = Enum.Material.Metal })
+				shell(folder, lt, Vector3.new(0.06, 0.06, 0.02), Vector3.new(x, 0.28, -0.57), Color3.fromRGB(170, 170, 176), { Name = "Rivet", Material = Enum.Material.Metal })
 			end
 		elseif item == "KneeSleeves" then
 			local band = look.SleeveBand or Color3.fromRGB(190, 30, 36)
 			for _, n in ipairs({ "LeftLowerLeg", "RightLowerLeg" }) do
 				local ll = P[n]
 				if ll then
-					shell(folder, ll, Vector3.new(1.24 + 0.3 * legs, 0.34, 1.26 + 0.4 * legs), Vector3.new(0, 0.34, 0.04 * legs), Color3.fromRGB(22, 22, 24), { Name = "KneeSleeve", Round = false, Material = Enum.Material.Rubber })
-					shell(folder, ll, Vector3.new(1.27 + 0.3 * legs, 0.06, 1.29 + 0.4 * legs), Vector3.new(0, 0.2, 0.04 * legs), band, { Name = "SleeveBand", Round = false })
+					shell(folder, ll, Vector3.new(1.1 + 0.35 * legs, 0.32, 1.12 + 0.45 * legs), Vector3.new(0, 0.34, 0.04 * legs), Color3.fromRGB(22, 22, 24), { Name = "KneeSleeve", Round = false, Material = Enum.Material.Rubber })
+					shell(folder, ll, Vector3.new(1.12 + 0.35 * legs, 0.06, 1.14 + 0.45 * legs), Vector3.new(0, 0.2, 0.04 * legs), band, { Name = "SleeveBand", Round = false })
 				end
 			end
 		end
@@ -450,10 +464,11 @@ function CharacterLooks.BuildTag(model, char, rarity, income)
 	local k = rarity.TagScale or 1
 	local tag = Instance.new("BillboardGui")
 	tag.Name = "NameTag"
-	tag.Size = UDim2.new(0, 220 * k, 0, 96 * k)
-	tag.StudsOffsetWorldSpace = Vector3.new(0, 3.4, 0)
-	tag.AlwaysOnTop = true
-	tag.MaxDistance = rarity.Index >= 5 and 400 or (rarity.Index >= 3 and 160 or 100)
+	-- sized in studs so tags shrink with distance and don't swamp the screen
+	tag.Size = UDim2.fromScale(6 * k, 2.6 * k)
+	tag.StudsOffsetWorldSpace = Vector3.new(0, 2.6 + 0.6 * k, 0)
+	tag.AlwaysOnTop = false
+	tag.MaxDistance = rarity.Index >= 5 and 150 or (rarity.Index >= 3 and 110 or 80)
 	tag.LightInfluence = 0
 	tag.Parent = head
 
@@ -512,50 +527,50 @@ end
 -- ----------------------------------------------------------------------
 local function rarityFx(model, char, rarity)
 	local root = model:FindFirstChild("HumanoidRootPart")
-	if rarity.Outline then
-		local hl = Instance.new("Highlight")
-		hl.Name = "RarityOutline"
-		hl.OutlineColor = rarity.Color
-		hl.FillColor = rarity.Color
-		hl.FillTransparency = rarity.Index >= 6 and 0.82 or 1
-		hl.OutlineTransparency = rarity.Index >= 4 and 0 or 0.35
-		hl.DepthMode = Enum.HighlightDepthMode.Occluded
-		hl.Parent = model
-	end
+	-- no Highlight: its fill/outline washed the whole body in the rarity color
 	if root and (rarity.Aura or 0) > 0 then
 		local att = Instance.new("Attachment")
 		att.Name = "AuraAttachment"
+		att.Position = Vector3.new(0, -root.Size.Y * 1.3, 0) -- around the feet
 		att.Parent = root
 		local aura = Instance.new("ParticleEmitter")
 		aura.Name = "RarityAura"
 		aura.Color = ColorSequence.new(rarity.Color, rarity.Glow)
-		aura.LightEmission = 1
-		aura.Rate = rarity.Aura
-		aura.Lifetime = NumberRange.new(1, 1.8)
-		aura.Speed = NumberRange.new(0.5, 2)
-		aura.SpreadAngle = Vector2.new(180, 180)
-		aura.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 0) })
-		aura.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1) })
-		aura.Acceleration = Vector3.new(0, 1.5, 0)
+		aura.LightEmission = 0.5
+		aura.LightInfluence = 0
+		aura.Rate = math.min(rarity.Aura, 10)
+		aura.Lifetime = NumberRange.new(1.2, 2)
+		aura.Speed = NumberRange.new(0.4, 1.2)
+		aura.SpreadAngle = Vector2.new(25, 25)
+		aura.EmissionDirection = Enum.NormalId.Top
+		aura.Shape = Enum.ParticleEmitterShape.Disc
+		aura.ShapeStyle = Enum.ParticleEmitterShapeStyle.Surface
+		aura.ShapeInOut = Enum.ParticleEmitterShapeInOut.Outward
+		att.Axis = Vector3.new(1, 0, 0)
+		att.SecondaryAxis = Vector3.new(0, 0, 1)
+		aura.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.18), NumberSequenceKeypoint.new(1, 0) })
+		aura.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.35), NumberSequenceKeypoint.new(1, 1) })
+		aura.Acceleration = Vector3.new(0, 1.2, 0)
 		aura.Parent = att
 	end
 	local ut = model:FindFirstChild("UpperTorso") or root
-	if ut and (rarity.Light or 0) > 0 then
+	if root and (rarity.Light or 0) > 0 then
+		-- a soft pool of rarity-colored light on the belt, not on the skin
 		local light = Instance.new("PointLight")
 		light.Name = "RarityLight"
 		light.Color = rarity.Color
-		light.Brightness = rarity.Light
-		light.Range = 8 + rarity.Index * 1.5
+		light.Brightness = math.min(rarity.Light, 3) * 0.25
+		light.Range = 6 + rarity.Index * 0.5
 		light.Shadows = false
-		light.Parent = ut
+		light.Parent = root:FindFirstChild("AuraAttachment") or root
 	end
 	if char.Glow and ut then
 		-- "always in perfect gym lighting"
 		local glow = Instance.new("PointLight")
 		glow.Name = "PerfectLighting"
 		glow.Color = Color3.fromRGB(255, 244, 228)
-		glow.Brightness = 1.2
-		glow.Range = 10
+		glow.Brightness = 0.5
+		glow.Range = 8
 		glow.Shadows = false
 		glow.Parent = ut
 	end
@@ -593,9 +608,10 @@ function CharacterLooks.Build(char, opts)
 	folder.Name = "Look"
 	folder.Parent = model
 	local P, top, bottom = paint(model, look)
-	cloth(folder, P, top, bottom, look)
-	bulk(folder, P, build)
-	gear(folder, P, look, build)
+	local shape = shapeOf(build)
+	cloth(folder, P, top, bottom, look, shape)
+	bulk(folder, P, shape)
+	gear(folder, P, look, shape)
 	if P.Head then
 		local capped = false
 		for _, pr in ipairs(look.Props or {}) do

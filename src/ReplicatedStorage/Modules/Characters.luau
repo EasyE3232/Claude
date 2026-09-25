@@ -48,7 +48,7 @@ Characters.RARITIES = {
 		SpawnSound = { Id = "rbxasset://sounds/electronicpingshort.wav", Volume = 0.3, Pitch = 1.3 },
 		PurchaseSound = { Id = "rbxasset://sounds/electronicpingshort.wav", Volume = 0.45, Pitch = 1.25 },
 		Particles = 14, Outline = false, Aura = 0, Light = 0,
-		TagScale = 1.05,
+		TagScale = 1.02,
 	},
 	{
 		Id = "Rare", DisplayName = "RARE", Odds = 6,
@@ -56,7 +56,7 @@ Characters.RARITIES = {
 		SpawnSound = { Id = "rbxasset://sounds/electronicpingshort.wav", Volume = 0.45, Pitch = 1 },
 		PurchaseSound = { Id = "rbxasset://sounds/electronicpingshort.wav", Volume = 0.6, Pitch = 0.9 },
 		Particles = 24, Outline = true, Aura = 0, Light = 0,
-		TagScale = 1.1,
+		TagScale = 1.04,
 	},
 	{
 		Id = "Epic", DisplayName = "EPIC", Odds = 1.6,
@@ -65,7 +65,7 @@ Characters.RARITIES = {
 		PurchaseSound = { Id = "rbxasset://sounds/electronicpingshort.wav", Volume = 0.7, Pitch = 0.75 },
 		Particles = 40, Outline = true, Aura = 3, Light = 0.8,
 		Gradient = { C(210, 140, 255), C(140, 60, 255) },
-		TagScale = 1.18,
+		TagScale = 1.07,
 	},
 	{
 		Id = "Legendary", DisplayName = "LEGENDARY", Odds = 0.32,
@@ -75,7 +75,7 @@ Characters.RARITIES = {
 		Particles = 70, Outline = true, Aura = 8, Light = 1.4,
 		Gradient = { C(255, 230, 120), C(255, 130, 20) },
 		Announce = "Chat", ConveyorFlash = 4,
-		TagScale = 1.28,
+		TagScale = 1.1,
 	},
 	{
 		Id = "Mythic", DisplayName = "MYTHIC", Odds = 0.075,
@@ -85,7 +85,7 @@ Characters.RARITIES = {
 		Particles = 110, Outline = true, Aura = 16, Light = 2,
 		Gradient = { C(255, 120, 200), C(255, 40, 80), C(170, 60, 255) },
 		Announce = "Banner", ConveyorFlash = 10, ConveyorColor = C(255, 40, 110),
-		TagScale = 1.4,
+		TagScale = 1.14,
 	},
 	{
 		Id = "GOAT", DisplayName = "G.O.A.T.", Odds = 0.005,
@@ -95,7 +95,7 @@ Characters.RARITIES = {
 		Particles = 180, Outline = true, Aura = 28, Light = 3,
 		Gradient = { C(255, 250, 200), C(255, 200, 40), C(255, 150, 0) },
 		Announce = "Event", ConveyorFlash = 14, ConveyorColor = C(255, 200, 40),
-		TagScale = 1.6,
+		TagScale = 1.18,
 	},
 }
 
