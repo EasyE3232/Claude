@@ -23,6 +23,7 @@ local Characters = require(RS.Modules.Characters)
 local StationSpecs = require(RS.Modules.Gym.StationSpecs)
 local NpcService = require(SSS.NpcService)
 local MeshCharacter = require(RS.Modules.MeshCharacter)
+local CharacterModels = require(SSS.CharacterModels)
 
 local CharacterLooks = {}
 
@@ -583,6 +584,15 @@ end
 function CharacterLooks.Build(char, opts)
 	opts = opts or {}
 	local rarity = Characters.GetRarity(char.Rarity)
+	-- 1) a real rigged model (uploaded asset or .rbxm), sized like the rest
+	local buildH = (char.Look and char.Look.Build and char.Look.Build.Height) or 1
+	local rigged = CharacterModels.Build(char, 5.95 * buildH * StationSpecs.SCALE)
+	if rigged then
+		rigged.Name = char.DisplayName
+		local model = NpcService.CreateRig({ Name = char.DisplayName, Model = rigged, Face = false })
+		return CharacterLooks._finish(model, char, rarity)
+	end
+	-- 2) a baked Meshy mesh (tools/meshy/import.py)
 	local meshData = char.Mesh and MeshCharacter.Get(char.Mesh)
 	if meshData then
 		-- model-based character: invisible rig here, clients add the mesh

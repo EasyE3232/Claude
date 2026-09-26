@@ -59,6 +59,14 @@ No script hardcodes a price, income or rarity.
 
 ## Meshy / 3D model characters
 
+**Best quality: a rigged model.** In Studio, import the FBX, run
+**Avatar > Auto Setup** (turns it into a smoothly skinned R15 avatar), then
+either upload it and put its asset ID in the character's `AssetId`, or
+right-click > Save to File and drop the `.rbxm` in `tools/models/<ModelName>.rbxm`.
+The game uses that model first (see `ServerScriptService/CharacterModels.luau`).
+
+**Without a rig:** the baked route below.
+
 Any character can use an imported 3D model instead of the part-built look:
 set `Mesh = "<Name>"` on it in `Characters.luau`.
 

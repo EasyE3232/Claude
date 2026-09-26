@@ -168,6 +168,33 @@ local function addScripts(dir, parent)
 	end
 end
 
+-- Rigged character models: tools/models/<ModelName>.rbxm(x) -> ServerStorage.CharacterModels
+local oldModels = ServerStorage:FindFirstChild("CharacterModels")
+if oldModels then
+	oldModels:Destroy()
+end
+local modelsFolder = Instance.new("Folder")
+modelsFolder.Name = "CharacterModels"
+modelsFolder.Parent = ServerStorage
+if fs.isDir("tools/models") then
+	for _, entry in ipairs(fs.readDir("tools/models")) do
+		if entry:match("%.rbxmx?$") then
+			local base = entry:gsub("%.rbxmx?$", "")
+			local roots = R.deserializeModel(fs.readFile("tools/models/" .. entry))
+			local holder = roots[1]
+			if #roots > 1 or not holder:IsA("Model") then
+				holder = Instance.new("Model")
+				for _, r in ipairs(roots) do
+					r.Parent = holder
+				end
+			end
+			holder.Name = base
+			holder.Parent = modelsFolder
+			print("[build] character model " .. base)
+		end
+	end
+end
+
 addScripts("src/ReplicatedStorage", RS)
 addScripts("src/ServerScriptService", SSS)
 addScripts("src/StarterPlayerScripts", StarterPlayer:FindFirstChildOfClass("StarterPlayerScripts"))

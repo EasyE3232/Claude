@@ -143,6 +143,7 @@ Characters.MUTATIONS = {
 --   Poses = { ... }        belt posing idles: DoubleBiceps Vacuum MostMuscular LatSpread
 --                          CrossedArms SideChest Point
 --   SpawnFx = "Cinematic" | "Milestone" | "GoldSpotlight" | "HeavyLanding" | "GoldenEra"
+--   AssetId = n            uploaded rigged R15 Model asset (or tools/models/<ModelName>.rbxm)
 --   Mesh = "Name"          use the imported model in ReplicatedStorage.MeshAssets.<Name>
 --                          (tools/meshy/import.py) instead of the part-built Look
 --   Tags = { "Meta", "Value", "Collector", "Flex", "Jackpot", ... } (for UI / future filters)
@@ -480,7 +481,9 @@ Characters.LIST = {
 	{
 		Name = "RonnieCurlman", DisplayName = "Ronnie Curlman", InspiredBy = "Ronnie Coleman",
 		Rarity = "GOAT", Price = 20e12, IncomePerSecond = 3.35e9, SpawnWeight = 27, ModelName = "RonnieCurlman",
-		Mesh = "RonnieCurlman", -- Meshy model (MeshAssets/RonnieCurlman); Look below is the fallback
+		-- Uploaded rigged model: paste its Roblox asset ID here (used first).
+		AssetId = nil,
+		Mesh = "RonnieCurlman", -- baked Meshy model (MeshAssets/RonnieCurlman), used if no AssetId
 		Look = { Skin = C(107, 63, 42), Hair = { Style = "Bald", Color = HAIR.Black },
 			Top = { Style = "Tank", Color = C(26, 26, 26) }, Bottom = { Style = "Shorts", Color = C(31, 31, 31) },
 			Shoes = C(17, 17, 17), ShoeStyle = "Boots",
