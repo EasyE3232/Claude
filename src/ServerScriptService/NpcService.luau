@@ -132,13 +132,18 @@ end
 --[[
 	opts = {
 		Name, Skin, Shirt, Pants, Height, Width, Depth, AvatarUserId, Scale,
-		Face = true (adds the classic face decal when the head has none)
+		Face = true (adds the classic face decal when the head has none),
+		Model = prebuilt R15 rig to set up instead of creating an avatar
 	}
 ]]
 function NpcService.CreateRig(opts)
 	opts = opts or {}
-	local desc = buildDescription(opts)
-	local model, isBlock = createModel(desc)
+	local model, isBlock
+	if opts.Model then
+		model, isBlock = opts.Model, false -- prebuilt rig (mesh characters)
+	else
+		model, isBlock = createModel(buildDescription(opts))
+	end
 	if isBlock then
 		model = BlockRig.Build({ Skin = opts.Skin, Shirt = opts.Shirt, Pants = opts.Pants, Scale = opts.Scale })
 	elseif opts.Scale and opts.Scale ~= 1 then

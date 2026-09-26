@@ -22,6 +22,7 @@ local Constants = require(RS.Modules.Constants)
 local Characters = require(RS.Modules.Characters)
 local StationSpecs = require(RS.Modules.Gym.StationSpecs)
 local NpcService = require(SSS.NpcService)
+local MeshCharacter = require(RS.Modules.MeshCharacter)
 
 local CharacterLooks = {}
 
@@ -582,6 +583,15 @@ end
 function CharacterLooks.Build(char, opts)
 	opts = opts or {}
 	local rarity = Characters.GetRarity(char.Rarity)
+	local meshData = char.Mesh and MeshCharacter.Get(char.Mesh)
+	if meshData then
+		-- model-based character: invisible rig here, clients add the mesh
+		local model = NpcService.CreateRig({ Name = char.DisplayName, Model = MeshCharacter.BuildRig(meshData), Face = false })
+		pcall(function()
+			model:ScaleTo(StationSpecs.SCALE)
+		end)
+		return CharacterLooks._finish(model, char, rarity)
+	end
 	local look = char.Look or {}
 	local build = look.Build or {}
 	local model = NpcService.CreateRig({
@@ -637,6 +647,10 @@ function CharacterLooks.Build(char, opts)
 		model:ScaleTo(StationSpecs.SCALE)
 	end)
 
+	return CharacterLooks._finish(model, char, rarity)
+end
+
+function CharacterLooks._finish(model, char, rarity)
 	rarityFx(model, char, rarity)
 
 	model:SetAttribute("CharacterId", char.Name)

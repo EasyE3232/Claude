@@ -1,0 +1,14 @@
+{
+  "comment": "Landmarks in the FBX's own space after its -90 X rotation: x = left/right (use |x|), y = -1 (feet) .. 1 (top). Read off tools/meshy preview renders.",
+  "fbx": "/root/.claude/uploads/bbf0102c-ed3e-5c30-aa50-ca0bf902bb27/96fd554f-Meshy_AI_Ronnie_Curlman_Darker_0925025355_texture.fbx",
+  "faces": "+Z",
+  "height": 6.55,
+  "texture": 1024,
+  "neck": 0.72, "waist": 0.10, "hip": [0.16, -0.12],
+  "shoulder": [0.33, 0.58], "elbow": [0.46, 0.27], "wrist": [0.50, 0.0], "handTip": [0.51, -0.21],
+  "torsoHalfWidth": { "waist": 0.28, "chest": 0.40 },
+  "legMaxX": 0.36,
+  "knee": [0.24, -0.47], "ankle": [0.31, -0.84],
+  "radius": { "Head": 0.16, "UpperTorso": 0.36, "LowerTorso": 0.26, "UpperArm": 0.13, "LowerArm": 0.12, "Hand": 0.10,
+              "UpperLeg": 0.17, "LowerLeg": 0.14, "Foot": 0.16 }
+}

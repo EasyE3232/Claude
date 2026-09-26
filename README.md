@@ -57,6 +57,34 @@ No script hardcodes a price, income or rarity.
 * All characters are **parody-inspired** Roblox versions: no real logos,
   tattoos, branded clothing or merch.
 
+## Meshy / 3D model characters
+
+Any character can use an imported 3D model instead of the part-built look:
+set `Mesh = "<Name>"` on it in `Characters.luau`.
+
+1. Make a JSON next to the importer, e.g. `tools/meshy/RonnieCurlman.json`:
+   the FBX path, target height, and where the neck, shoulders, elbows, wrists,
+   hips, knees and ankles are on the model (read off the preview).
+2. `python3 tools/meshy/import.py tools/meshy/<Name>.json --preview`
+   bakes `ReplicatedStorage/MeshAssets/<Name>/` (rig + mesh cut into the 15
+   R15 body parts + 1024² texture) and draws `build/meshy_<Name>.png`
+   (colors = body parts, dots = joints).
+3. `lune run tools/meshy/posecheck_mesh <Name>` + `python3 tools/meshy/render_mesh.py <Name>`
+   renders the textured model in the belt poses to check the cut.
+
+In game the server spawns an invisible R15 rig with joints at the model's
+real joints (so it walks, paths and does every workout), and each client builds
+the textured body parts with `EditableMesh`/`EditableImage` and welds them on.
+Each part carries a pulled-in copy of the skin around its joint and renders
+double-sided, so bending joints don't open holes.
+
+**Publishing:** EditableMesh/EditableImage work in Studio play-tests right
+away. In a published game the owner must be ID verified and turn on
+**Enable Mesh / Image APIs** in the Creator Dashboard. If they're off, the
+character falls back to its plain rig blocks. The alternative is importing
+the FBX in Studio (3D Importer → R15 rig), which uploads it as a normal
+mesh asset.
+
 ## How the realistic motion works
 
 Motion is procedural and runs on every client, with no uploaded animation assets:

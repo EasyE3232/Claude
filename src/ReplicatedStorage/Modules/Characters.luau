@@ -104,7 +104,7 @@ Characters.RARITIES = {
 -- ----------------------------------------------------------------------
 -- PREVIEW: set to a list of character Names to make the conveyor spawn ONLY
 -- those, in turn (for looking at new designs). Set to nil for normal odds.
-Characters.PREVIEW = { "JayCuttler", "RonnieCurlman", "ArnieIronberg" }
+Characters.PREVIEW = { "RonnieCurlman" }
 -- while previewing, big spawn events (banner, lights, gold world) fire at
 -- most this often so they don't stack every few seconds
 Characters.PREVIEW_EVENT_COOLDOWN = 25
@@ -143,6 +143,8 @@ Characters.MUTATIONS = {
 --   Poses = { ... }        belt posing idles: DoubleBiceps Vacuum MostMuscular LatSpread
 --                          CrossedArms SideChest Point
 --   SpawnFx = "Cinematic" | "Milestone" | "GoldSpotlight" | "HeavyLanding" | "GoldenEra"
+--   Mesh = "Name"          use the imported model in ReplicatedStorage.MeshAssets.<Name>
+--                          (tools/meshy/import.py) instead of the part-built Look
 --   Tags = { "Meta", "Value", "Collector", "Flex", "Jackpot", ... } (for UI / future filters)
 -- ----------------------------------------------------------------------
 
@@ -478,6 +480,7 @@ Characters.LIST = {
 	{
 		Name = "RonnieCurlman", DisplayName = "Ronnie Curlman", InspiredBy = "Ronnie Coleman",
 		Rarity = "GOAT", Price = 20e12, IncomePerSecond = 3.35e9, SpawnWeight = 27, ModelName = "RonnieCurlman",
+		Mesh = "RonnieCurlman", -- Meshy model (MeshAssets/RonnieCurlman); Look below is the fallback
 		Look = { Skin = C(107, 63, 42), Hair = { Style = "Bald", Color = HAIR.Black },
 			Top = { Style = "Tank", Color = C(26, 26, 26) }, Bottom = { Style = "Shorts", Color = C(31, 31, 31) },
 			Shoes = C(17, 17, 17), ShoeStyle = "Boots",
