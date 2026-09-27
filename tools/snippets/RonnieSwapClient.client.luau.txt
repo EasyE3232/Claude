@@ -1,0 +1,5 @@
+local RS=game:GetService("RunService") local list={}
+local function joints(root,skip) local t={} for _,d in ipairs(root:GetDescendants()) do if (d:IsA("Motor6D") or d:IsA("AnimationConstraint")) and not (skip and d:IsDescendantOf(skip)) then t[d.Name]=d end end return t end
+local function track(g) task.wait(0.5) local m=g.Parent if not m then return end local src,dst=joints(m,g),joints(g) local l={} for n,j in pairs(dst) do if src[n] then table.insert(l,{src[n],j}) end end list[g]=l end
+workspace.DescendantAdded:Connect(function(d) if d:IsA("Model") and d.Name=="GoodRonnie" and d.Parent and d.Parent:GetAttribute("CharacterId") then task.spawn(track,d) end end)
+RS.Heartbeat:Connect(function() for g,l in pairs(list) do if not g.Parent then list[g]=nil else for _,p in ipairs(l) do p[2].Transform=p[1].Transform end end end end)

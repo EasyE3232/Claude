@@ -1,0 +1,17 @@
+local SS=game:GetService("ServerStorage") local YAW=0
+local function swap(m)
+local good=SS:FindFirstChild("GoodRonnie") if not good then return end
+local hrp=m:WaitForChild("HumanoidRootPart",10) if not hrp then return end
+local cf,size=m:GetBoundingBox() local feet=cf.Position.Y-size.Y/2 local H=size.Y
+for _,d in ipairs(m:GetDescendants()) do if d:IsA("BasePart") or d:IsA("Decal") then d.Transparency=1 end end
+local g=good:Clone() g.Name="GoodRonnie"
+for _,d in ipairs(g:GetDescendants()) do if d:IsA("BaseScript") or d:IsA("Humanoid") then d:Destroy() end end
+local gcf,gs=g:GetBoundingBox() pcall(function() g:ScaleTo(g:GetScale()*H/gs.Y) end) gcf,gs=g:GetBoundingBox()
+local p=hrp.CFrame.Position local rot=(hrp.CFrame-p)*CFrame.Angles(0,math.rad(YAW),0)
+local box=CFrame.new(p.X,feet+gs.Y/2,p.Z)*rot*(gcf-gcf.Position)
+g:PivotTo(box*g:GetPivot():ToObjectSpace(gcf):Inverse())
+local root=g:FindFirstChild("HumanoidRootPart")
+for _,d in ipairs(g:GetDescendants()) do if d:IsA("BasePart") then d.Anchored=false d.CanCollide=false d.CanQuery=false d.CanTouch=false d.Massless=true if not root then local w=Instance.new("WeldConstraint") w.Part0=hrp w.Part1=d w.Parent=d end end end
+if root then root.Transparency=1 local w=Instance.new("WeldConstraint") w.Part0=hrp w.Part1=root w.Parent=root end
+g.Parent=m end
+workspace.DescendantAdded:Connect(function(m) if m:IsA("Model") and m:GetAttribute("CharacterId")=="RonnieCurlman" then m:SetAttribute("MeshCharacter",nil) task.spawn(swap,m) end end)
