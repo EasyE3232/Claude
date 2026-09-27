@@ -41,6 +41,9 @@ a new build.
 - No color-changing effects (owner request). No on-screen HUD clocks: the
   guaranteed-drop clocks live only on the wall board above the drop gate.
 
+- Meshy prompts for the roster: `lune run tools/meshy/prompts` -> `tools/meshy/PROMPTS.md`
+  (build order + per-character prompt; re-run after roster changes).
+
 ## Tooling notes
 - Map builder must use `Geo.lookAt`, never `CFrame.lookAt` (Lune bug).
 - Lune has no `Part.Position`; use `part.CFrame.Position` in code that is
