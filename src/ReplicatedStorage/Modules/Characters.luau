@@ -104,7 +104,12 @@ Characters.RARITIES = {
 -- ----------------------------------------------------------------------
 -- PREVIEW: set to a list of character Names to make the conveyor spawn ONLY
 -- those, in turn (for looking at new designs). Set to nil for normal odds.
-Characters.PREVIEW = { "RonnieCurlman" }
+Characters.PREVIEW = nil
+-- ONLY_WITH_MODELS: while characters are being made in Meshy, only those that
+-- have a real model (placed in the game / baked mesh / AssetId) spawn. The
+-- server sets Characters.Filter (see CharacterModels.HasModel).
+Characters.ONLY_WITH_MODELS = true
+Characters.Filter = nil
 -- while previewing, big spawn events (banner, lights, gold world) fire at
 -- most this often so they don't stack every few seconds
 Characters.PREVIEW_EVENT_COOLDOWN = 25
@@ -577,14 +582,52 @@ function Characters.Roll(rng)
 	end
 	local candidates = {}
 	for _, r in ipairs(Characters.RARITIES) do
-		if #Characters.BY_RARITY[r.Id] > 0 then
+		if #Characters.Eligible(r.Id) > 0 then
 			table.insert(candidates, r)
 		end
+	end
+	if #candidates == 0 then
+		return nil
 	end
 	local rarity = weightedPick(candidates, function(r)
 		return r.Odds
 	end, rng)
-	return weightedPick(Characters.BY_RARITY[rarity.Id], function(c)
+	return weightedPick(Characters.Eligible(rarity.Id), function(c)
+		return c.SpawnWeight
+	end, rng)
+end
+
+-- Characters of a rarity that are allowed to spawn right now.
+function Characters.Eligible(rarityId)
+	local list = Characters.BY_RARITY[rarityId] or {}
+	if not (Characters.ONLY_WITH_MODELS and Characters.Filter) then
+		return list
+	end
+	local out = {}
+	for _, c in ipairs(list) do
+		if Characters.Filter(c) then
+			table.insert(out, c)
+		end
+	end
+	return out
+end
+
+-- A character of exactly this rarity (guaranteed drops), or nil if none can spawn.
+function Characters.RollOfRarity(rarityId, rng)
+	local pool = Characters.Eligible(rarityId)
+	if Characters.PREVIEW and #Characters.PREVIEW > 0 then
+		pool = {}
+		for _, name in ipairs(Characters.PREVIEW) do
+			local c = Characters.BY_NAME[name]
+			if c and c.Rarity == rarityId then
+				table.insert(pool, c)
+			end
+		end
+	end
+	if #pool == 0 then
+		return nil
+	end
+	return weightedPick(pool, function(c)
 		return c.SpawnWeight
 	end, rng)
 end

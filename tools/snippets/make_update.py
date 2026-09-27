@@ -22,11 +22,13 @@ FILES = [
     "src/StarterPlayerScripts/GymAnimator.client.luau",
     "src/StarterPlayerScripts/MeshCharacters.client.luau",
     "src/StarterPlayerScripts/PortalFx.client.luau",
+    "src/StarterPlayerScripts/DropClocks.client.luau",
 ]
 
 # builders shared with the map generator, installed as temporary modules
 PATCH_MODULES = [
     ("Gate", "tools/map/Gate.luau"),
+    ("ClockBoard", "tools/map/ClockBoard.luau"),
     ("Walls", "tools/map/Walls.luau"),
 ]
 
@@ -100,9 +102,10 @@ M.Walls.Build(env,HX,HZ,30,{Width=12,Height=18})
 for _,c in ipairs(env:GetChildren()) do if c:IsA("BasePart") and (c.Name=="RedCarpet" or c.Name=="CarpetEdge") then c.Size=Vector3.new(c.Size.X,c.Size.Y,HZ*2) end end
 end
 if belt then
-for _,nm in ipairs({"DropTunnel","ExitTunnel","DropGate","ExitGate"}) do local o=belt:FindFirstChild(nm) if o then o:Destroy() end end
+for _,nm in ipairs({"DropTunnel","ExitTunnel","DropGate","ExitGate","DropClock"}) do local o=belt:FindFirstChild(nm) if o then o:Destroy() end end
 M.Gate.Build(belt,"DropGate",CFrame.new(0,0,-HZ)*CFrame.Angles(0,math.pi,0),Color3.fromRGB(60,170,255),"INFLUENCER DROP",12,18,4)
 M.Gate.Build(belt,"ExitGate",CFrame.new(0,0,HZ),Color3.fromRGB(255,70,90),"LAST CHANCE",12,18,4)
+M.ClockBoard.Build(belt,CFrame.new(0,0,-HZ)*CFrame.Angles(0,math.pi,0),20.2)
 local dp=belt:FindFirstChild("DropPoint") if dp then dp.CFrame=CFrame.new(0,3.5,-HZ-1) end
 local bs=belt:FindFirstChild("BeltStart") if bs then bs.CFrame=CFrame.new(0,3,-HZ+1) end
 local be=belt:FindFirstChild("BeltEnd") if be then be.CFrame=CFrame.new(0,3,HZ+1.2) end
@@ -158,7 +161,7 @@ if not s then s=Instance.new(e[2]) s.Name=name s.Parent=parent end
 s.Source=e[3]
 installed+=1
 end
-print(("GYM WARS UPDATED: %d scripts, wall teleporters, gyms at %d studs from the carpet, %d stair ramps. Press Ctrl/Cmd+S, then Play."):format(installed,LOTX,ramps))
+print(("GYM WARS UPDATED: %d scripts, wall teleporters + drop clocks, gyms at %d studs from the carpet, %d stair ramps. Press Ctrl/Cmd+S, then Play."):format(installed,LOTX,ramps))
 '''
 lines = [l.strip() for l in code.strip().splitlines() if l.strip()]
 body = " ".join(lines)

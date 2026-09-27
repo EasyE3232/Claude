@@ -45,51 +45,6 @@ local function playSound(def, parent, volumeMul)
 end
 
 -- ----------------------------------------------------------------------
--- Conveyor color
--- ----------------------------------------------------------------------
--- (the parade line: tunnel glows + the carpet's brass edges flash, and for
--- Mythic / G.O.A.T. the red carpet itself changes color)
-local beltGlow, carpet = {}, {}
-do
-	for _, d in ipairs(map:GetDescendants()) do
-		if d:IsA("BasePart") then
-			if d.Name == "TunnelGlow" or d.Name == "CarpetEdge" then
-				table.insert(beltGlow, { Part = d, Color = d.Color, Material = d.Material })
-			elseif d.Name == "RedCarpet" then
-				table.insert(carpet, { Part = d, Color = d.Color })
-			end
-		end
-	end
-end
-
-local beltToken = 0
-local function tintConveyor(color, seconds, recolorBelt)
-	beltToken += 1
-	local token = beltToken
-	for _, g in ipairs(beltGlow) do
-		g.Part.Color = color
-		g.Part.Material = Enum.Material.Neon
-	end
-	if recolorBelt then
-		for _, c in ipairs(carpet) do
-			c.Part.Color = color:Lerp(c.Color, 0.25)
-		end
-	end
-	task.delay(seconds, function()
-		if token ~= beltToken then
-			return
-		end
-		for _, g in ipairs(beltGlow) do
-			g.Part.Color = g.Color
-			g.Part.Material = g.Material
-		end
-		for _, c in ipairs(carpet) do
-			c.Part.Color = c.Color
-		end
-	end)
-end
-
--- ----------------------------------------------------------------------
 -- Banner
 -- ----------------------------------------------------------------------
 local gui = Instance.new("ScreenGui")
@@ -192,18 +147,6 @@ local function flickerGymLights(seconds)
 	end)
 end
 
-local function goldenWorld(seconds)
-	local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
-	if not cc then
-		return
-	end
-	local orig = { TintColor = cc.TintColor, Brightness = cc.Brightness, Saturation = cc.Saturation, Contrast = cc.Contrast }
-	TweenService:Create(cc, TweenInfo.new(0.8), { TintColor = Color3.fromRGB(255, 214, 140), Brightness = 0.08, Saturation = 0.25, Contrast = 0.15 }):Play()
-	task.delay(seconds, function()
-		TweenService:Create(cc, TweenInfo.new(1.6), orig):Play()
-	end)
-end
-
 local function shakeCamera(strength, seconds)
 	local t0 = os.clock()
 	local conn
@@ -274,11 +217,6 @@ FxRemote.OnClientEvent:Connect(function(kind, data)
 	if kind == "Spawn" then
 		local global = rarity.Index >= 5
 		playSound(rarity.SpawnSound, (not global) and root or nil)
-		if rarity.ConveyorFlash then
-			tintConveyor(rarity.ConveyorColor or rarity.Glow, rarity.ConveyorFlash, rarity.ConveyorColor ~= nil)
-		elseif rarity.Index >= 3 then
-			tintConveyor(rarity.Glow, 1.2, false)
-		end
 		if rarity.Index >= 7 then
 			playSound(rarity.SpawnSound, nil, 1)
 			task.delay(0.35, function()
@@ -291,9 +229,7 @@ FxRemote.OnClientEvent:Connect(function(kind, data)
 		elseif data.SpawnFx == "Milestone" then
 			banner("FIRST $1 BILLION/SEC CHARACTER!", data.Name:upper(), rarity, 4)
 		end
-		if data.SpawnFx == "GoldenEra" then
-			goldenWorld(6)
-		elseif data.SpawnFx == "HeavyLanding" and root then
+		if data.SpawnFx == "HeavyLanding" and root then
 			-- the ground shakes as he stomps out of the gate
 			task.delay(1.2, function()
 				if not root.Parent then

@@ -34,7 +34,12 @@ a new build.
 - Their Ronnie model lives in `ServerStorage.GoodRonnie`;
   `CharacterModels.Init()` picks it up by name. Don't rename/move it.
 - `ServerScriptService.StudioMoney` (Studio-only cash) may exist; leave it.
-- Conveyor preview: `Characters.PREVIEW = { "RonnieCurlman" }`.
+- Spawning: `Characters.PREVIEW = nil`, `Characters.ONLY_WITH_MODELS = true`:
+  only characters with a real model (placed in the place by name, baked
+  MeshAssets, or AssetId) walk the carpet. The owner is making 20-30 Meshy
+  characters and imports them into their place, named after the character.
+- No color-changing effects (owner request). No on-screen HUD clocks: the
+  guaranteed-drop clocks live only on the wall board above the drop gate.
 
 ## Tooling notes
 - Map builder must use `Geo.lookAt`, never `CFrame.lookAt` (Lune bug).

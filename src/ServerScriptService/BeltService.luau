@@ -189,6 +189,7 @@ function BeltService.Init()
 	end
 	InfluencerService.OnPurchased = BeltService.OnPurchased
 	workspace:SetAttribute("BeltSpeed", 0) -- nothing scrolls any more
+	BeltService.StartClocks()
 
 	RunService.Heartbeat:Connect(function(dt)
 		BeltService.Step(dt)
@@ -197,6 +198,34 @@ end
 
 local checkAccum = 0
 local lastPreviewEvent = -math.huge
+local nextLegendaryAt, nextMythicAt, forcedReadyAt = math.huge, math.huge, 0
+
+-- Walk a character out of the drop gate (and announce it).
+local function spawnCharacter(char, guaranteed)
+	local rarity = Characters.GetRarity(char.Rarity)
+	local drop = nextDropPoint()
+	local pos = drop.Position -- everyone walks out of the gate (no sky drops)
+	-- avatar creation can yield (asset loading), so don't block Heartbeat
+	task.spawn(function()
+		local rec = InfluencerService.Spawn(char, CFrame.new(pos))
+		if rec and rec.Model then
+			local now = os.clock()
+			if guaranteed or not Characters.PREVIEW or now - lastPreviewEvent >= Characters.PREVIEW_EVENT_COOLDOWN then
+				lastPreviewEvent = now
+				announce(char, rarity, rec.Model)
+			end
+		end
+	end)
+end
+
+function BeltService.StartClocks()
+	local now = workspace:GetServerTimeNow()
+	nextLegendaryAt = now + Constants.BELT.GuaranteeLegendary
+	nextMythicAt = now + Constants.BELT.GuaranteeMythic
+	workspace:SetAttribute("GuaranteeLegendaryAt", nextLegendaryAt)
+	workspace:SetAttribute("GuaranteeMythicAt", nextMythicAt)
+end
+
 function BeltService.Step(dt)
 	local cfg = Constants.BELT
 
@@ -224,25 +253,38 @@ function BeltService.Step(dt)
 		end
 	end
 
+	-- guaranteed drops: a Legendary every 5 min, a Mythic every 15 min
+	-- (the clock board in the wall shows these countdowns)
+	local now = workspace:GetServerTimeNow()
+	if now >= forcedReadyAt then
+		local forced
+		if now >= nextMythicAt then
+			forced = "Mythic"
+			nextMythicAt += cfg.GuaranteeMythic
+		elseif now >= nextLegendaryAt then
+			forced = "Legendary"
+			nextLegendaryAt += cfg.GuaranteeLegendary
+		end
+		if forced then
+			workspace:SetAttribute("GuaranteeLegendaryAt", nextLegendaryAt)
+			workspace:SetAttribute("GuaranteeMythicAt", nextMythicAt)
+			forcedReadyAt = now + 3 -- keep two guaranteed drops from stacking in the doorway
+			local char = Characters.RollOfRarity(forced, rng)
+			if char then
+				spawnTimer = 0
+				spawnCharacter(char, true)
+			end
+		end
+	end
+
 	spawnTimer += dt
 	if spawnTimer >= cfg.SpawnInterval then
 		spawnTimer = 0
 		if InfluencerService.CountOnBelt() < cfg.MaxOnBelt then
 			local char = Characters.Roll(rng)
-			local rarity = Characters.GetRarity(char.Rarity)
-			local drop = nextDropPoint()
-			local pos = drop.Position -- everyone walks out of the gate (no sky drops)
-			-- avatar creation can yield (asset loading), so don't block Heartbeat
-			task.spawn(function()
-				local rec = InfluencerService.Spawn(char, CFrame.new(pos))
-				if rec and rec.Model then
-					local now = os.clock()
-					if not Characters.PREVIEW or now - lastPreviewEvent >= Characters.PREVIEW_EVENT_COOLDOWN then
-						lastPreviewEvent = now
-						announce(char, rarity, rec.Model)
-					end
-				end
-			end)
+			if char then
+				spawnCharacter(char, false)
+			end
 		end
 	end
 end

@@ -65,6 +65,19 @@ function CharacterModels.Init()
 			if (d:IsA("Model") or d:IsA("MeshPart")) and not d:GetAttribute("CharacterId") and not d:IsDescendantOf(folder)
 				and not (map and d:IsDescendantOf(map)) then
 				local n = norm(d.Name)
+				-- an exact name match wins, whatever its length ("Joe", "SamSulik")
+				local exact
+				for _, c in ipairs(Characters.LIST) do
+					if not found[c.ModelName] and not folder:FindFirstChild(c.ModelName)
+						and (n == norm(c.ModelName or "") or n == norm(c.Name) or n == norm(c.DisplayName)) then
+						exact = c
+						break
+					end
+				end
+				if exact then
+					found[exact.ModelName] = d
+					continue
+				end
 				for _, kc in ipairs(keys) do
 					local c = kc[2]
 					if not found[c.ModelName] and n:find(kc[1], 1, true) and not folder:FindFirstChild(c.ModelName) then
@@ -146,6 +159,22 @@ local function fromAsset(id)
 		assetCache[id] = rig or false
 	end
 	return assetCache[id] or nil
+end
+
+-- Does this character have a real model to spawn with? (placed/baked/asset)
+function CharacterModels.HasModel(char)
+	local folder = ServerStorage:FindFirstChild("CharacterModels")
+	if folder and char.ModelName and folder:FindFirstChild(char.ModelName) then
+		return true
+	end
+	if char.AssetId then
+		return true
+	end
+	if char.Mesh then
+		local assets = game:GetService("ReplicatedStorage"):FindFirstChild("MeshAssets")
+		return assets ~= nil and assets:FindFirstChild(char.Mesh) ~= nil
+	end
+	return false
 end
 
 function CharacterModels.Template(char)

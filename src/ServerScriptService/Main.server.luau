@@ -25,6 +25,8 @@ local CharacterModels = require(SSS.CharacterModels)
 -- Init order matters: plots first (everything hangs off them)
 -- ----------------------------------------------------------------------
 CharacterModels.Init() -- before anything spawns
+-- only characters with a real model walk the carpet (Characters.ONLY_WITH_MODELS)
+require(RS.Modules.Characters).Filter = CharacterModels.HasModel
 EnvironmentService.Init()
 NpcService.Init()
 PlotService.Init()

@@ -13,6 +13,7 @@
 local Geo = require("tools/map/Geo")
 local Gym = require("tools/map/Gym")
 local Gate = require("tools/map/Gate")
+local ClockBoard = require("tools/map/ClockBoard")
 local Walls = require("tools/map/Walls")
 
 local Map = {}
@@ -201,6 +202,8 @@ function Map.Build(workspace)
 	-- the teleport gates set into the end walls: walk out of one, vanish into the other
 	Gate.Build(belt, "DropGate", CFrame.new(0, 0, -hz) * CFrame.Angles(0, math.pi, 0), Color3.fromRGB(60, 170, 255), "INFLUENCER DROP", Map.GATE_W, Map.GATE_H, 4)
 	Gate.Build(belt, "ExitGate", CFrame.new(0, 0, hz), Color3.fromRGB(255, 70, 90), "LAST CHANCE", Map.GATE_W, Map.GATE_H, 4)
+	-- guaranteed-drop clocks in the wall above the drop gate
+	ClockBoard.Build(belt, CFrame.new(0, 0, -hz) * CFrame.Angles(0, math.pi, 0), Map.GATE_H + 2.2)
 
 	-- ================= lots =================
 	local plots = Geo.folder(root, "Plots")
