@@ -52,14 +52,18 @@ local PROPS = {
 	Cap = "wearing a plain baseball cap",
 }
 local BUILD_BY_RARITY = {
-	Common = "fit, lightly muscular regular gym-goer build",
-	Uncommon = "athletic, clearly muscular build",
-	Rare = "very muscular, broad-shouldered build",
-	Epic = "huge bodybuilder physique with big arms and shoulders",
-	Legendary = "massive pro bodybuilder physique, wide back, huge arms",
-	Mythic = "extreme stage-ready bodybuilder physique, shredded, very wide",
-	GOAT = "legendary giant bodybuilder physique, enormous and iconic",
+	Common = "fit gym-goer (the least muscular tier, but still the same chunky stylized proportions)",
+	Uncommon = "clearly muscular and athletic",
+	Rare = "very muscular with big shoulders and arms",
+	Epic = "huge, heavily muscled bodybuilder",
+	Legendary = "massive pro bodybuilder, wide back, enormous arms",
+	Mythic = "extreme stage-ready bodybuilder, shredded and very wide",
+	GOAT = "legendary giant bodybuilder, the most massive and iconic tier",
 }
+local LEVEL = { Common = "COMMON", Uncommon = "UNCOMMON", Rare = "RARE", Epic = "EPIC", Legendary = "LEGENDARY", Mythic = "MYTHIC", GOAT = "G.O.A.T." }
+local function hex(c)
+	return c and ("#%02X%02X%02X"):format(math.floor(c.R * 255 + 0.5), math.floor(c.G * 255 + 0.5), math.floor(c.B * 255 + 0.5)) or nil
+end
 local function buildText(ch)
 	local b = (ch.Look and ch.Look.Build) or {}
 	local parts = { BUILD_BY_RARITY[ch.Rarity] or "muscular build" }
@@ -71,7 +75,9 @@ local function buildText(ch)
 	return table.concat(parts, ", ")
 end
 
-local STYLE = "stylized 3D character for a Roblox game, full body, standing in an A-pose with arms slightly away from the body and hands NOT touching the legs, symmetrical, feet flat, facing forward. Clean cartoon-realistic style, bold readable shapes, hand-painted texture, plain background. No logos, no text, no tattoos, no brand marks."
+-- the look of the Ronnie Curlman sheet / model
+local STYLE = "Same art style as the attached Ronnie Curlman sheet: stylized 3D render of a hyper-muscular figure with exaggerated heroic proportions like a premium collectible action figure (huge rounded shoulders and traps, big chest and arms, chunky fists, thick sturdy legs, slightly large head), realistic-cartoon face with the person's likeness from the attached photo (follow the photo for face, hair and beard if they differ from the notes below), smooth painted skin with bold muscle shading, dark gym background with warm golden spotlights."
+local SHEET = "Layout exactly like the Ronnie sheet: big hero render top-left with the NAME in gold block letters, a small gold crown and '%s LEVEL' under it; two face close-ups on the right (front and 3/4); a row of FRONT / SIDE / BACK full-body turnaround views in a neutral A-pose with arms slightly away from the body and hands NOT touching the legs; a row of 4 pose examples; and a stats box at the bottom with a small blocky Roblox-style figure. No real logos, brand names, merch or tattoos."
 
 local function prompt(ch)
 	local lk = ch.Look or {}
@@ -113,8 +119,37 @@ local function prompt(ch)
 	end
 	if ch.Glow then table.insert(bits, "Confident, camera-ready look.") end
 	if ch.Chart then table.insert(bits, "Smart, analytical vibe.") end
-	local text = table.concat(bits, " ")
-	return (text:gsub("^%l", string.upper)):gsub("%. (%l)", function(c) return ". " .. c:upper() end) .. " " .. (STYLE:gsub("^%l", string.upper))
+	local looks = table.concat(bits, " ")
+	looks = looks:gsub("^%l", string.upper):gsub("%. (%l)", function(c) return ". " .. c:upper() end)
+	return looks
+end
+
+local function statsBox(ch)
+	local lk = ch.Look or {}
+	local r = C.GetRarity(ch.Rarity)
+	local lines = {
+		("Name: %s"):format(ch.DisplayName),
+		("ModelName: %s"):format(ch.ModelName),
+		("Rarity: %s"):format(r.DisplayName),
+		("Cost: $%s"):format(K.FormatNumber(ch.Price)),
+		("Income: $%s/s"):format(K.FormatNumber(ch.IncomePerSecond)),
+		("Inspired By: %s (parody)"):format(ch.InspiredBy),
+	}
+	if lk.Skin then table.insert(lines, ("Skin Tone: %s"):format(hex(lk.Skin))) end
+	if lk.Top then table.insert(lines, ("Top: %s %s, %s"):format(colorName(lk.Top.Color), TOP[lk.Top.Style] or lk.Top.Style, hex(lk.Top.Color))) end
+	if lk.Bottom then table.insert(lines, ("Bottom: %s %s, %s"):format(colorName(lk.Bottom.Color), BOTTOM[lk.Bottom.Style] or lk.Bottom.Style, hex(lk.Bottom.Color))) end
+	return table.concat(lines, "; ")
+end
+
+local function sheetPrompt(ch)
+	local look = prompt(ch)
+	return ("Create a character sheet for \"%s\", a parody of %s for my Roblox game Gym Wars. %s Look: %s Stats box: %s. %s"):format(
+		ch.DisplayName, ch.InspiredBy, STYLE, look, statsBox(ch), SHEET:format(LEVEL[ch.Rarity] or ch.Rarity:upper()))
+end
+
+local function meshyPrompt(ch)
+	return ("%s, stylized 3D game character in the style of a premium collectible action figure: exaggerated heroic proportions, huge rounded shoulders, big arms, chunky fists, thick legs, slightly large head, realistic-cartoon face. %s Full body, A-pose, arms slightly away from the body, hands not touching the legs, symmetrical, feet flat. No logos, no text, no tattoos."):format(
+		ch.DisplayName, prompt(ch))
 end
 
 local DONE = { RonnieCurlman = true }
@@ -140,23 +175,19 @@ local batches = {
 
 local out = {}
 local function w(s) table.insert(out, s or "") end
-w("# Gym Wars: Meshy prompts")
+w("# Gym Wars: character prompts (Ronnie Curlman style)")
 w()
-w("One prompt per character, in the order to make them. Ronnie Curlman is done.")
-w("Copy a prompt into Meshy **Text to 3D**, or better, make a sheet image first and use **Image to 3D**.")
-w("When a model is in your place, name it exactly like the **Name in game** line, e.g. `JoeFlexer`.")
+w("Every character is made the same way Ronnie was: a **character sheet** first, then **Meshy Image to 3D** from it.")
+w("That keeps all 40 in the exact same style as Ronnie. Ronnie Curlman is done.")
 w()
-w("## Meshy settings (every character)")
-w("- Mode: Text to 3D (or Image to 3D from a front-view sheet)")
-w("- Pose: **A-pose** · Symmetry: **on** · Topology: triangle · Target polycount: **~10,000**")
-w("- Texture: on (PBR) · Export: **FBX**")
-w("- Check before export: arms away from the body, hands not touching the thighs, feet flat")
+w("## For each character")
+w("1. **ChatGPT (image):** attach **(a)** your reference photo of the real person and **(b)** the Ronnie Curlman sheet image (style guide), then paste the **Sheet prompt**.")
+w("2. **Meshy → Image to 3D:** crop the sheet to the **FRONT** full-body view (plain background if you can) and upload it.")
+w("   Settings: **A-pose**, symmetry **on**, ~**10,000** polygons, texture **on** (PBR). Export **FBX**.")
+w("   No good sheet? Use the **Meshy text prompt** in Text to 3D instead.")
+w("3. **Studio:** Avatar → **Import 3D** → **Auto Setup** → rename to the **Name in game** → drop in **ServerStorage** → Play.")
 w()
-w("## In Studio (per character)")
-w("1. **Avatar tab → Import 3D** → pick the FBX")
-w("2. **Avatar → Auto Setup** on it (makes it walk and work out properly)")
-w("3. Rename it to the **Name in game** below and drop it in **ServerStorage**")
-w("4. Press Play: it walks the carpet automatically")
+w("Muscle size goes up with rarity (Common = fit gym-goer ... G.O.A.T. = giant), but the proportions and art style stay Ronnie's.")
 w()
 local n = 0
 for _, b in ipairs(batches) do
@@ -169,8 +200,16 @@ for _, b in ipairs(batches) do
 			w(("### %d. %s · %s"):format(n, ch.DisplayName, r.DisplayName))
 			w(("Name in game: `%s` · Price $%s · earns +$%s/s"):format(ch.ModelName, K.FormatNumber(ch.Price), K.FormatNumber(ch.IncomePerSecond)))
 			w()
+			w("**Sheet prompt** (ChatGPT, attach photo + Ronnie sheet):")
+			w()
 			w("```")
-			w(prompt(ch))
+			w(sheetPrompt(ch))
+			w("```")
+			w()
+			w("**Meshy text prompt** (fallback):")
+			w()
+			w("```")
+			w(meshyPrompt(ch))
 			w("```")
 			w()
 		end
