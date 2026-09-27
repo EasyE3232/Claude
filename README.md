@@ -12,7 +12,7 @@ and play-test with **Graphics Quality 8+**. Future lighting is enabled.
 
 | Area | What it is |
 |---|---|
-| **Map** | Compact: a 264 × 356-stud grass field, **8 slim gyms** (4 per side) 76 studs apart along a red-carpet conveyor fed by a single drop tunnel, with a ~50-stud front yard between the carpet and each door. Layered broadleaf and pine trees, bushes, rocks, stone walls with hedges, curbed walkways, modern street lamps and dynamic clouds. Lighting uses Future + the *Realistic* lighting style with tuned atmosphere, bloom, color grading and subtle depth of field. |
+| **Map** | Compact: a 264 × 356-stud grass field, **8 slim gyms** (4 per side) 76 studs apart along a straight **red carpet**. No concrete, just grass and the carpet. Characters walk out of the drop tunnel and parade straight down the carpet to the exit tunnel (Steal a Brainrot style). Layered trees, bushes, rocks, stone walls with hedges, street lamps and dynamic clouds; Future lighting with the *Realistic* style. |
 | **Gyms** | Slim glass fitness clubs that **grow a story each time you buy a floor** (56 wide × 72 deep, 16-stud floors), with a **U-shaped corner staircase** (open wood treads, black steel stringers, cable railings, a landing halfway up): dark frame, full-height glass, floor bands, a rooftop sign that rides up to the newest roof. The front door lines up with a **clear center aisle** straight to the back wall, and a cross aisle leads to the stairs. Each floor has a mirror wall with dumbbell racks and a floor sign, ducts, and LED strip lighting. |
 | **Floors = capacity** | Floor 1 (Cardio & Dumbbells, 12 machines) is free. **Floor 2 (Machines, +12)** and **Floor 3 (Power Zone, +9)** are the *Gym Floors* shop upgrade ($7,500 / $45,000). Unbought floors, and the stairs up to them, don't exist in the world: they wait in `ServerStorage.HiddenGymFloors` until bought. |
 | **3 of each machine (33 per gym)** | Groups of 3 side by side. F1: treadmills, spin bikes, dumbbell-curl stations, DB shoulder press. F2: lat pulldowns, cable rows, leg extensions, chin/dip assist. F3: squat racks, deadlift platforms, bench presses. |
@@ -99,6 +99,20 @@ away. In a published game the owner must be ID verified and turn on
 character falls back to its plain rig blocks. The alternative is importing
 the FBX in Studio (3D Importer → R15 rig), which uploads it as a normal
 mesh asset.
+
+## Getting around the gyms
+
+* **Stairs** are invisible ramps (flush with each floor and the landing) under
+  the wooden treads. `tools/staircheck.luau` sweeps a body up a revealed
+  switchback and checks the walking surface is continuous.
+  (The map builder uses `Geo.lookAt`, not Lune's `CFrame.lookAt`, which
+  mangles sloped directions; that's what used to break the stairs.)
+* **NPC routes** don't rely on the navmesh: every gym carries invisible `Nav`
+  points (Yard, DoorOut, Lobby, CrossN, StairFootN, LandAN, LandBN,
+  StairTopN, F3Turn/F3Lane) and `ServerScriptService/GymNav` strings them into
+  a route from wherever the character is (another gym, any floor, the carpet)
+  to its machine. `tools/navcheck.luau` plans every machine's route and sweeps
+  a body along each leg.
 
 ## How the realistic motion works
 

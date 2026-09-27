@@ -47,17 +47,16 @@ end
 -- ----------------------------------------------------------------------
 -- Conveyor color
 -- ----------------------------------------------------------------------
-local beltGlow, chevrons = {}, {}
+-- (the parade line: tunnel glows + the carpet's brass edges flash, and for
+-- Mythic / G.O.A.T. the red carpet itself changes color)
+local beltGlow, carpet = {}, {}
 do
-	local belt = map:WaitForChild("Belt", 10)
-	if belt then
-		for _, d in ipairs(belt:GetDescendants()) do
-			if d:IsA("BasePart") then
-				if d.Name == "BeltGlow" or d.Name == "TunnelGlow" then
-					table.insert(beltGlow, { Part = d, Color = d.Color })
-				elseif d.Parent and d.Parent.Name == "Chevron" then
-					table.insert(chevrons, { Part = d, Color = d.Color, Material = d.Material })
-				end
+	for _, d in ipairs(map:GetDescendants()) do
+		if d:IsA("BasePart") then
+			if d.Name == "TunnelGlow" or d.Name == "CarpetEdge" then
+				table.insert(beltGlow, { Part = d, Color = d.Color, Material = d.Material })
+			elseif d.Name == "RedCarpet" then
+				table.insert(carpet, { Part = d, Color = d.Color })
 			end
 		end
 	end
@@ -69,11 +68,11 @@ local function tintConveyor(color, seconds, recolorBelt)
 	local token = beltToken
 	for _, g in ipairs(beltGlow) do
 		g.Part.Color = color
+		g.Part.Material = Enum.Material.Neon
 	end
 	if recolorBelt then
-		for _, c in ipairs(chevrons) do
-			c.Part.Color = color
-			c.Part.Material = Enum.Material.Neon
+		for _, c in ipairs(carpet) do
+			c.Part.Color = color:Lerp(c.Color, 0.25)
 		end
 	end
 	task.delay(seconds, function()
@@ -82,10 +81,10 @@ local function tintConveyor(color, seconds, recolorBelt)
 		end
 		for _, g in ipairs(beltGlow) do
 			g.Part.Color = g.Color
+			g.Part.Material = g.Material
 		end
-		for _, c in ipairs(chevrons) do
+		for _, c in ipairs(carpet) do
 			c.Part.Color = c.Color
-			c.Part.Material = c.Material
 		end
 	end)
 end

@@ -380,7 +380,9 @@ RunService.PreSimulation:Connect(function(dt)
 				if lt then
 					lastPelvis[model] = lt.CFrame
 				end
-				if state == "OnBelt" and model:GetAttribute("Poses") then
+				-- walkers strut; they only strike poses if they're standing still
+				local root = model:FindFirstChild("HumanoidRootPart")
+				if state == "OnBelt" and model:GetAttribute("Poses") and root and root.AssemblyLinearVelocity.Magnitude < 1 then
 					beltPose(model, now, camPos)
 				end
 			end

@@ -397,7 +397,9 @@ function NpcService.Follow(model, player, speed, offset)
 end
 
 -- Walk to a point, then call onArrive(model). onFail after `timeout` seconds.
-function NpcService.WalkTo(model, point, speed, onArrive, timeout, onFail)
+-- `route` (optional): list of Vector3 walked point to point first (plain
+-- MoveTo, no pathfinding), e.g. a GymNav route through doors and up stairs.
+function NpcService.WalkTo(model, point, speed, onArrive, timeout, onFail, route)
 	local c = newController(model)
 	c.Mode = "WalkTo"
 	c.Target = point
@@ -406,6 +408,8 @@ function NpcService.WalkTo(model, point, speed, onArrive, timeout, onFail)
 	c.Deadline = os.clock() + (timeout or 30)
 	c.Humanoid.WalkSpeed = speed or Constants.NPC.SeatSpeed
 	c.Waypoints = nil
+	c.Route = route
+	c.RouteIndex = 1
 	c.LastProgressAt = os.clock()
 end
 
@@ -494,6 +498,25 @@ local function followWaypoints(c)
 	return true
 end
 
+-- stuck detection: jump, and if that doesn't help, hop a few studs forward
+local function unstick(c, pos, goal)
+	local now = os.clock()
+	if not c.LastProgressPos or (pos - c.LastProgressPos).Magnitude > 1.2 then
+		c.LastProgressPos = pos
+		c.LastProgressAt = now
+	elseif now - c.LastProgressAt > 1.4 then
+		c.Humanoid.Jump = true
+		c.Waypoints = nil
+		if now - c.LastProgressAt > 5 then
+			local dir = flat(goal - pos)
+			if dir.Magnitude > 0.1 then
+				c.Model:PivotTo(CFrame.new(pos + dir.Unit * math.min(6, dir.Magnitude) + Vector3.new(0, 2, 0)))
+			end
+			c.LastProgressAt = now
+		end
+	end
+end
+
 -- Returns true when the NPC reached `goal` (XZ within arriveDist).
 local function steer(c, goal, arriveDist)
 	local pos = c.Root.Position
@@ -519,24 +542,30 @@ local function steer(c, goal, arriveDist)
 		end
 	end
 
-	-- stuck detection
-	local now = os.clock()
-	if not c.LastProgressPos or (pos - c.LastProgressPos).Magnitude > 1.2 then
-		c.LastProgressPos = pos
-		c.LastProgressAt = now
-	elseif now - c.LastProgressAt > 1.4 then
-		c.Humanoid.Jump = true
-		c.Waypoints = nil
-		if now - c.LastProgressAt > 5 then
-			-- hopelessly stuck: hop a few studs toward the goal
-			local dir = flat(goal - pos)
-			if dir.Magnitude > 0.1 then
-				c.Model:PivotTo(CFrame.new(pos + dir.Unit * math.min(6, dir.Magnitude) + Vector3.new(0, 2, 0)))
-			end
-			c.LastProgressAt = now
+	unstick(c, pos, goal)
+	return false
+end
+
+-- Follow a fixed route one point at a time. Returns true once it's done.
+local function followRoute(c)
+	local route = c.Route
+	if not route then
+		return true
+	end
+	local pos = c.Root.Position
+	while c.RouteIndex <= #route do
+		local p = route[c.RouteIndex]
+		-- intermediate points only need to be passed on the right level
+		if flat(p - pos).Magnitude < 2.5 and math.abs(p.Y - pos.Y) < 7 then
+			c.RouteIndex += 1
+		else
+			c.Humanoid:MoveTo(p)
+			unstick(c, pos, p)
+			return false
 		end
 	end
-	return false
+	c.Route = nil
+	return true
 end
 
 local function leaderRoot(c)
@@ -618,7 +647,17 @@ function NpcService._step(dt)
 				c.Humanoid:MoveTo(c.Root.Position)
 			end
 		elseif c.Mode == "WalkTo" then
-			if steer(c, c.Target, 1.6) then
+			if not followRoute(c) then
+				if os.clock() > c.Deadline then
+					c.Mode = "None"
+					c.Route = nil
+					local cb = c.OnFail
+					c.OnArrive, c.OnFail = nil, nil
+					if cb then
+						task.spawn(cb, model)
+					end
+				end
+			elseif steer(c, c.Target, 1.6) then
 				c.Mode = "None"
 				local cb = c.OnArrive
 				c.OnArrive, c.OnFail = nil, nil

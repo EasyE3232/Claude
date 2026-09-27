@@ -2,7 +2,7 @@
 	InfluencerService
 	Owns every influencer NPC (a real R15 character) and its lifecycle:
 
-	  OnBelt    -> standing on the conveyor, riding it (claimable by anyone)
+	  OnBelt    -> walking down the red carpet (claimable by anyone)
 	  Seating   -> claimed: walking on their own, straight to a machine in the
 	               claimer's gym (the machine is reserved the moment they're claimed)
 	  Placed    -> training on a machine (anchored; clients animate the workout),
@@ -25,6 +25,7 @@ local Constants = require(RS.Modules.Constants)
 local PlayerDataService = require(SSS.PlayerDataService)
 local PlotService = require(SSS.PlotService)
 local NpcService = require(SSS.NpcService)
+local GymNav = require(SSS.GymNav)
 local Characters = require(RS.Modules.Characters)
 local CharacterLooks = require(SSS.CharacterLooks)
 local Notify = require(SSS.Notify)
@@ -148,13 +149,6 @@ end
 -- ----------------------------------------------------------------------
 -- Getting to a machine
 -- ----------------------------------------------------------------------
-local function hopOffBelt(rec)
-	-- step off the conveyor rails with a little hop
-	if rec.Humanoid then
-		rec.Humanoid.Jump = true
-	end
-end
-
 -- Get off a machine: stand upright at the machine's approach point, unanchored.
 local function standUp(rec)
 	local station = rec.StationRef.Value
@@ -213,7 +207,9 @@ local function walkTo(rec, plot, slot, speed, onArrive)
 		task.defer(arrive)
 		return
 	end
-	NpcService.WalkTo(rec.Model, approach.Position, speed, arrive, Constants.NPC.SeatTimeout, arrive)
+	-- fixed route: lawn -> door -> aisle -> stairs -> landing -> right floor
+	local route = GymNav.Route(rec.Root.Position, plot.Model, station:GetAttribute("Floor") or 1, approach.Position)
+	NpcService.WalkTo(rec.Model, approach.Position, speed, arrive, Constants.NPC.SeatTimeout, arrive, route)
 end
 
 -- Reserve `slot` in `plot` for rec and send them there.
@@ -282,14 +278,13 @@ local function newRecord(char, seed, state, mutation)
 	}
 end
 
--- Spawn a character on the belt at `spawnCF` (facing sideways, toward the gyms).
+-- Spawn a character at `spawnCF`, facing down the carpet (+Z); BeltService walks them.
 function InfluencerService.Spawn(char, spawnCF)
 	local rec = newRecord(char, nil, "OnBelt")
 	local model = buildModel(rec)
 	setState(rec, "OnBelt")
-	local side = rng:NextNumber() < 0.5 and 1 or -1
 	local pos = spawnCF.Position
-	model:PivotTo(CFrame.lookAt(pos, pos + Vector3.new(side, 0, 0)))
+	model:PivotTo(CFrame.lookAt(pos, pos + Vector3.new(0, 0, 1)))
 	model.Parent = folder
 	NpcService.Activate(model)
 	return rec
@@ -389,10 +384,10 @@ function InfluencerService.OnGrab(player, rec)
 		end
 		local wasOnBelt = rec.State == "OnBelt"
 		rec.CarrierUserId = uid
-		sendToOwnMachine(rec, myPlot, slot, Constants.NPC.TravelSpeed)
-		if wasOnBelt then
-			hopOffBelt(rec)
+		if wasOnBelt and rec.Humanoid then
+			rec.Humanoid:Move(Vector3.zero) -- stop parading; the walk to the gym takes over
 		end
+		sendToOwnMachine(rec, myPlot, slot, Constants.NPC.TravelSpeed)
 		local station = PlotService.GetStation(myPlot.Id, slot)
 		Notify(player, "Bought " .. rec.Name .. " for $" .. Constants.FormatNumber(rec.Price) .. "! Heading to your " .. (station and PlotService.StationName(station) or "gym") .. " (+$" .. Constants.FormatNumber(rec.Income) .. "/s)", "success")
 		return
@@ -577,7 +572,6 @@ end
 -- ----------------------------------------------------------------------
 local tickAccum = 0
 local despawnAccum = 0
-local emoteAccum = 0
 
 function InfluencerService.Update(dt)
 	tickAccum += dt
@@ -591,19 +585,6 @@ function InfluencerService.Update(dt)
 				else
 					task.defer(InfluencerService.Destroy, rec)
 				end
-			end
-		end
-	end
-
-	-- belt riders show off now and then
-	emoteAccum += dt
-	if emoteAccum >= 1 then
-		emoteAccum = 0
-		for _, rec in pairs(records) do
-			if rec.State == "OnBelt" and rng:NextNumber() < Constants.NPC.EmoteChance and not rec.Char.Poses then
-				local fav = rec.Char.Emote
-				local emote = (fav and rng:NextNumber() < 0.7) and fav or NpcService.EMOTES[rng:NextInteger(1, #NpcService.EMOTES)]
-				NpcService.PlayEmote(rec.Model, emote)
 			end
 		end
 	end

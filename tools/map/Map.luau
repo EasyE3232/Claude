@@ -31,7 +31,6 @@ Map.CARPET_HALF = 13
 local CARPET = Color3.fromRGB(128, 16, 26)
 local BRASS = Color3.fromRGB(176, 146, 86)
 local STONE = Color3.fromRGB(118, 114, 108)
-local CONCRETE = Color3.fromRGB(168, 166, 160)
 
 -- greens that read as real foliage under Future lighting
 local LEAF = {
@@ -151,8 +150,8 @@ local function lamp(parent, pos, faceDir)
 	Geo.tube(m, "Pole", pos, pos + Vector3.new(0, 13.6, 0), 0.45, Pal.FrameDark, M.Metal)
 	local armEnd = pos + Vector3.new(0, 13.6, 0) + faceDir * 3
 	Geo.decorate(Geo.tube(m, "Arm", pos + Vector3.new(0, 13.6, 0), armEnd, 0.3, Pal.FrameDark, M.Metal))
-	Geo.decorate(Geo.part(m, "Housing", Vector3.new(2, 0.35, 1), CFrame.lookAt(armEnd, armEnd + faceDir), Pal.FrameDark, M.Metal))
-	local lens = Geo.decorate(Geo.part(m, "Lens", Vector3.new(1.7, 0.08, 0.8), CFrame.lookAt(armEnd - Vector3.new(0, 0.2, 0), armEnd - Vector3.new(0, 0.2, 0) + faceDir), Color3.fromRGB(255, 244, 222), M.Neon))
+	Geo.decorate(Geo.part(m, "Housing", Vector3.new(2, 0.35, 1), Geo.lookAt(armEnd, armEnd + faceDir), Pal.FrameDark, M.Metal))
+	local lens = Geo.decorate(Geo.part(m, "Lens", Vector3.new(1.7, 0.08, 0.8), Geo.lookAt(armEnd - Vector3.new(0, 0.2, 0), armEnd - Vector3.new(0, 0.2, 0) + faceDir), Color3.fromRGB(255, 244, 222), M.Neon))
 	local light = Instance.new("SpotLight")
 	light.Face = Enum.NormalId.Bottom
 	light.Range = 36
@@ -167,7 +166,7 @@ end
 -- stone wall with a trimmed hedge on top
 local function wallRun(parent, a, b)
 	local len = (b - a).Magnitude
-	local cf = CFrame.lookAt((a + b) / 2, b)
+	local cf = Geo.lookAt((a + b) / 2, b)
 	Geo.part(parent, "StoneWall", Vector3.new(3, 3, len), cf + Vector3.new(0, 1.5, 0), STONE, M.Cobblestone)
 	Geo.part(parent, "WallCap", Vector3.new(3.6, 0.5, len), cf + Vector3.new(0, 3.25, 0), Color3.fromRGB(140, 136, 128), M.Slate)
 	Geo.part(parent, "Hedge", Vector3.new(3, 5, len), cf + Vector3.new(0, 6, 0), Color3.fromRGB(50, 80, 38), M.LeafyGrass)
@@ -176,9 +175,9 @@ end
 local function tunnel(parent, name, z, dir, label)
 	local cf = CFrame.new(0, 0, z)
 	local m = Geo.model(parent, name)
-	Geo.part(m, "TunnelLeft", Vector3.new(3, 12, 14), cf * CFrame.new(-7.5, 6, 0), Pal.FrameDark, M.Concrete)
-	Geo.part(m, "TunnelRight", Vector3.new(3, 12, 14), cf * CFrame.new(7.5, 6, 0), Pal.FrameDark, M.Concrete)
-	Geo.part(m, "TunnelTop", Vector3.new(18, 3, 14), cf * CFrame.new(0, 13.5, 0), Pal.FrameDark, M.Concrete)
+	Geo.part(m, "TunnelLeft", Vector3.new(3, 12, 14), cf * CFrame.new(-7.5, 6, 0), Pal.FrameDark, M.Metal)
+	Geo.part(m, "TunnelRight", Vector3.new(3, 12, 14), cf * CFrame.new(7.5, 6, 0), Pal.FrameDark, M.Metal)
+	Geo.part(m, "TunnelTop", Vector3.new(18, 3, 14), cf * CFrame.new(0, 13.5, 0), Pal.FrameDark, M.Metal)
 	Geo.part(m, "TunnelBack", Vector3.new(12, 12, 1), cf * CFrame.new(0, 6, dir * 6.5), Pal.Black, M.SmoothPlastic)
 	local face = -dir
 	Geo.decorate(Geo.part(m, "TunnelGlow", Vector3.new(12, 0.3, 0.3), cf * CFrame.new(0, 11.8, face * 7.1), Pal.Accent, M.Neon, { Role = "MapAccent" }))
@@ -212,46 +211,21 @@ function Map.Build(workspace)
 		end
 	end
 
-	-- red carpet boulevard with a slim brass edge and a concrete promenade either side
+	-- red carpet boulevard with a slim brass edge, straight onto the grass
 	local carpetLen = hz * 2 - 16
 	Geo.part(env, "RedCarpet", Vector3.new(Map.CARPET_HALF * 2, 0.12, carpetLen), CFrame.new(0, 0.06, 0), CARPET, M.Carpet)
 	for _, s in ipairs({ -1, 1 }) do
 		Geo.decorate(Geo.part(env, "CarpetEdge", Vector3.new(0.3, 0.14, carpetLen), CFrame.new(s * (Map.CARPET_HALF + 0.15), 0.07, 0), BRASS, M.Metal))
-		Geo.part(env, "Promenade", Vector3.new(6, 0.1, carpetLen), CFrame.new(s * (Map.CARPET_HALF + 3.3), 0.05, 0), CONCRETE, M.Pavement)
-		Geo.part(env, "Curb", Vector3.new(0.5, 0.3, carpetLen), CFrame.new(s * (Map.CARPET_HALF + 6.55), 0.15, 0), Color3.fromRGB(190, 188, 182), M.Concrete)
 	end
 
-	-- ================= conveyor =================
+	-- ================= walking line =================
+	-- Characters walk straight down the carpet from the drop tunnel to the exit;
+	-- these invisible markers define that line (BeltService walks them along it).
 	local belt = Geo.folder(root, "Belt")
-	local beltLen = Map.BELT_Z1 - Map.BELT_Z0
-	local beltMid = (Map.BELT_Z0 + Map.BELT_Z1) / 2
-	local track = Geo.part(belt, "BeltTrack", Vector3.new(Map.BELT_WIDTH, Map.BELT_TOP, beltLen), CFrame.new(0, Map.BELT_TOP / 2, beltMid), Pal.Belt, M.Rubber)
-	track:SetAttribute("Conveyor", true)
-	for _, s in ipairs({ -1, 1 }) do
-		local hxb = Map.BELT_WIDTH / 2
-		Geo.part(belt, "BeltSkirt", Vector3.new(1, 1.4, beltLen), CFrame.new(s * (hxb + 0.5), 0.7, beltMid), Pal.FrameDark, M.Metal)
-		Geo.decorate(Geo.part(belt, "BeltGlow", Vector3.new(0.2, 0.08, beltLen), CFrame.new(s * (hxb + 0.5), 1.43, beltMid), Pal.Accent, M.Neon, { Role = "MapAccent" }))
-		Geo.part(belt, s < 0 and "RailLeft" or "RailRight", Vector3.new(0.3, 0.6, beltLen), CFrame.new(s * (hxb + 0.85), 1.7, beltMid), Pal.Chrome, M.Metal, { Reflectance = 0.1 })
-	end
-	Geo.decorate(Geo.part(belt, "BeltStart", Vector3.new(1, 1, 1), CFrame.new(0, Map.BELT_TOP + 3, Map.BELT_Z0 + 4), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
-	Geo.decorate(Geo.part(belt, "BeltEnd", Vector3.new(1, 1, 1), CFrame.new(0, Map.BELT_TOP + 3, Map.BELT_Z1 - 4), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
-	local startPoint = Geo.decorate(Geo.part(belt, "DropPoint", Vector3.new(1, 1, 1), CFrame.new(0, Map.BELT_TOP + 3, Map.BELT_Z0 + 5), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
+	Geo.decorate(Geo.part(belt, "BeltStart", Vector3.new(1, 1, 1), CFrame.new(0, 3, Map.BELT_Z0 + 4), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
+	Geo.decorate(Geo.part(belt, "BeltEnd", Vector3.new(1, 1, 1), CFrame.new(0, 3, Map.BELT_Z1 - 4), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
+	local startPoint = Geo.decorate(Geo.part(belt, "DropPoint", Vector3.new(1, 1, 1), CFrame.new(0, 3.5, Map.BELT_Z0 + 3), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
 	startPoint:SetAttribute("DropPoint", true)
-
-	local chev = Geo.folder(belt, "Chevrons")
-	local spacing = 8
-	local n = 0
-	for z = Map.BELT_Z0 + 2, Map.BELT_Z1 - 2, spacing do
-		n += 1
-		local m = Geo.model(chev, "Chevron")
-		local cf = CFrame.new(0, Map.BELT_TOP + 0.02, z)
-		local a = Geo.decorate(Geo.part(m, "A", Vector3.new(2.6, 0.04, 0.4), cf * CFrame.new(-1.05, 0, 0) * CFrame.Angles(0, rad(-35), 0), Color3.fromRGB(56, 56, 60), M.SmoothPlastic, { CastShadow = false }))
-		Geo.decorate(Geo.part(m, "B", Vector3.new(2.6, 0.04, 0.4), cf * CFrame.new(1.05, 0, 0) * CFrame.Angles(0, rad(35), 0), Color3.fromRGB(56, 56, 60), M.SmoothPlastic, { CastShadow = false }))
-		m.PrimaryPart = a
-	end
-	chev:SetAttribute("Spacing", spacing)
-	chev:SetAttribute("Z0", Map.BELT_Z0 + 2)
-	chev:SetAttribute("Length", n * spacing)
 
 	tunnel(belt, "DropTunnel", Map.BELT_Z0 - 2, -1, "INFLUENCER DROP")
 	tunnel(belt, "ExitTunnel", Map.BELT_Z1 + 2, 1, "LAST CHANCE")
@@ -263,17 +237,15 @@ function Map.Build(workspace)
 		for li, z in ipairs(Map.LOT_Z) do
 			id += 1
 			local center = Vector3.new(side * Map.LOT_X, 0, z)
-			Gym.Build(plots, id, CFrame.lookAt(center, Vector3.new(0, 0, z)))
+			local gymModel = Gym.Build(plots, id, Geo.lookAt(center, Vector3.new(0, 0, z)))
 
-			-- curbed walkway from the promenade to the door (the door is offset to the aisle)
+			-- open lawn from the carpet to the door (the door is offset to the aisle)
 			local doorZ = z - side * Gym.AISLE_X
 			local x0 = Map.CARPET_HALF + 6.8
 			local x1 = Map.LOT_X - Gym.D / 2
-			local walkLen = x1 - x0
-			Geo.part(env, "Walkway", Vector3.new(walkLen, 0.1, 10), CFrame.new(side * (x0 + walkLen / 2), 0.05, doorZ), CONCRETE, M.Pavement)
-			for _, dz in ipairs({ -5.25, 5.25 }) do
-				Geo.part(env, "WalkCurb", Vector3.new(walkLen, 0.3, 0.5), CFrame.new(side * (x0 + walkLen / 2), 0.15, doorZ + dz), Color3.fromRGB(190, 188, 182), M.Concrete)
-			end
+			-- where NPCs step off the carpet toward this gym (start of the lawn route)
+			local yard = Geo.decorate(Geo.part(gymModel.Nav, "Yard", Vector3.new(1, 1, 1), CFrame.new(side * (Map.CARPET_HALF + 4), 0, doorZ), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
+			yard.CastShadow = false
 			-- planting beds along the building front
 			for _, dz in ipairs({ -26, -15, 15, 26 }) do
 				bush(nature, Vector3.new(side * (x1 - 3), 0, doorZ + dz), 1, id * 31 + dz)
@@ -322,8 +294,8 @@ function Map.Build(workspace)
 	spawn.Anchored = true
 	spawn.Size = Vector3.new(12, 0.4, 12)
 	spawn.CFrame = CFrame.new(30, 0.2, -hz + 22)
-	spawn.Color = Color3.fromRGB(150, 148, 142)
-	spawn.Material = M.Slate
+	spawn.Color = Color3.fromRGB(88, 148, 66)
+	spawn.Material = M.Grass
 	spawn.TopSurface = Enum.SurfaceType.Smooth
 	spawn.Neutral = true
 	spawn.Duration = 0

@@ -1,12 +1,13 @@
 --[[
 	BeltService
-	The shared conveyor down the middle of the map. The BeltTrack part is a real
-	physics conveyor (its AssemblyLinearVelocity carries anything standing on
-	it), so characters ride it as physical R15 models and replicate smoothly.
+	The red-carpet parade down the middle of the map. Characters walk out of
+	the drop tunnel and straight down the carpet (BeltStart -> BeltEnd) at a
+	steady pace, held on the center line, until someone buys them or they
+	leave through the exit tunnel.
 
 	Every few seconds it rolls the next character from ReplicatedStorage.Modules
-	.Characters (rarity by Odds, then character by SpawnWeight) and drops it at
-	the tunnel. Rarity events (sounds, conveyor color, banners, G.O.A.T. server
+	.Characters (rarity by Odds, then character by SpawnWeight) and sends it
+	out of the tunnel. Rarity events (sounds, conveyor color, banners, G.O.A.T. server
 	events) are broadcast to clients through Remotes.CharacterFx; server-side
 	spectacle (spotlights, gold particles) is created here. Unsold characters
 	leave at BeltEnd.
@@ -153,7 +154,7 @@ end
 
 local rng = Random.new()
 local spawnTimer = 0
-local track, startPart, endPart
+local startPart, endPart
 local direction = Vector3.new(0, 0, 1)
 local dropPoints = {}
 local dropQueue = {}
@@ -174,12 +175,10 @@ end
 
 function BeltService.Init()
 	local belt = workspace:WaitForChild("GymWarsMap"):WaitForChild("Belt")
-	track = belt:WaitForChild("BeltTrack")
 	startPart = belt:WaitForChild("BeltStart")
 	endPart = belt:WaitForChild("BeltEnd")
 	direction = (endPart.Position - startPart.Position) * Vector3.new(1, 0, 1)
 	direction = direction.Unit
-	track.AssemblyLinearVelocity = direction * Constants.BELT.Speed
 	for _, d in ipairs(belt:GetDescendants()) do
 		if d:IsA("BasePart") and d:GetAttribute("DropPoint") then
 			table.insert(dropPoints, d)
@@ -188,9 +187,8 @@ function BeltService.Init()
 	if #dropPoints == 0 then
 		table.insert(dropPoints, startPart)
 	end
-	track:SetAttribute("Speed", Constants.BELT.Speed)
 	InfluencerService.OnPurchased = BeltService.OnPurchased
-	workspace:SetAttribute("BeltSpeed", Constants.BELT.Speed)
+	workspace:SetAttribute("BeltSpeed", 0) -- nothing scrolls any more
 
 	RunService.Heartbeat:Connect(function(dt)
 		BeltService.Step(dt)
@@ -201,24 +199,28 @@ local checkAccum = 0
 local lastPreviewEvent = -math.huge
 function BeltService.Step(dt)
 	local cfg = Constants.BELT
-	-- keep the conveyor running (in case something reset it)
-	if track.AssemblyLinearVelocity.Magnitude < 0.1 then
-		track.AssemblyLinearVelocity = direction * cfg.Speed
-	end
 
+	-- walkers: keep everyone marching down the center line
 	checkAccum += dt
-	if checkAccum >= 0.25 then
+	if checkAccum >= 0.2 then
 		checkAccum = 0
 		local endDist = (endPart.Position - startPart.Position):Dot(direction)
 		for _, rec in ipairs(InfluencerService.GetAllOnBelt()) do
+			local hum = rec.Humanoid
+			if not (hum and rec.Root) or rec.Root.Anchored then
+				continue
+			end
 			local rel = rec.Root.Position - startPart.Position
 			local along = rel:Dot(direction)
 			local lateral = (rel - direction * along) * Vector3.new(1, 0, 1)
 			if along >= endDist then
-				InfluencerService.Destroy(rec)
-			elseif lateral.Magnitude > track.Size.X / 2 + 2 then
-				InfluencerService.DropFromBelt(rec) -- fell off the side
+				InfluencerService.Destroy(rec) -- walked out through the exit tunnel
+				continue
 			end
+			-- walk forward, steering gently back onto the line
+			hum.WalkSpeed = cfg.WalkSpeed
+			local steer = direction - lateral * 0.25
+			hum:Move(steer.Unit, false)
 		end
 	end
 

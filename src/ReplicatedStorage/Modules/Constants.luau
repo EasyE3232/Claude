@@ -24,9 +24,10 @@ Constants.RACK_SLOT_MAX = 33 -- machines per gym (3 of each): 12 + 12 + 9 across
 -- Start/end points come from the BeltStart / BeltEnd parts in the map.
 -- ======================================================================
 Constants.BELT = {
-	SpawnInterval = 3.5, -- seconds between spawns (each one drops from the next chute in turn)
-	MaxOnBelt = 20, -- cap on how many ride the belt at once
-	Speed = 6, -- studs per second (the belt part's conveyor velocity)
+	SpawnInterval = 3.5, -- seconds between characters walking out of the tunnel
+	MaxOnBelt = 20, -- cap on how many walk the carpet at once
+	WalkSpeed = 7, -- studs per second down the carpet (a steady strut)
+	Speed = 6, -- legacy (old conveyor speed)
 	ClaimDistance = 11, -- ProximityPrompt activation range
 	ClaimHold = 0.3, -- seconds to hold the prompt
 	DroppedDespawn = 60, -- seconds a dropped, unowned influencer waits before leaving
@@ -42,7 +43,7 @@ Constants.NPC = {
 	SeatSpeed = 12,
 	ReturnSpeed = 16, -- walking back to their gym after the front desk saves them
 	TeleportIfFartherThan = 160,
-	SeatTimeout = 20, -- seconds before a stuck influencer just hops onto the machine
+	SeatTimeout = 45, -- seconds before a stuck influencer just hops onto the machine
 	EmoteChance = 0.12, -- per second, while riding the belt
 }
 

@@ -86,6 +86,19 @@ function Geo.axisCF(a, b)
 	return CFrame.fromMatrix(mid, dir, y, z)
 end
 
+-- Correct lookAt (Lune's CFrame.lookAt mangles any non-horizontal direction
+-- and flips Z): -Z faces target, like Roblox's.
+function Geo.lookAt(at, target, upHint)
+	local fwd = (target - at).Unit
+	local up = upHint or Vector3.new(0, 1, 0)
+	if math.abs(fwd:Dot(up)) > 0.999 then
+		up = Vector3.new(1, 0, 0)
+	end
+	local right = fwd:Cross(up).Unit
+	local upv = right:Cross(fwd).Unit
+	return CFrame.fromMatrix(at, right, upv, -fwd)
+end
+
 -- Cylinder tube from a to b.
 function Geo.tube(parent, name, a, b, diameter, color, material, opts)
 	return Geo.cyl(parent, name, (b - a).Magnitude, diameter, Geo.axisCF(a, b), color, material, opts)

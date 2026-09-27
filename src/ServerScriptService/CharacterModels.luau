@@ -43,7 +43,12 @@ function CharacterModels.Init()
 	local folder = modelsFolder()
 	local keys = {}
 	for _, c in ipairs(Characters.LIST) do
-		for _, k in ipairs({ c.ModelName, c.Name, c.DisplayName }) do
+		local names = { c.ModelName, c.Name, c.DisplayName }
+		-- single words of the name count too ("GoodRonnie" -> Ronnie Curlman)
+		for word in (c.DisplayName or ""):gmatch("%a+") do
+			table.insert(names, word)
+		end
+		for _, k in ipairs(names) do
 			if k and #norm(k) >= 6 then -- short names ("Joe") would match random parts
 				table.insert(keys, { norm(k), c })
 			end

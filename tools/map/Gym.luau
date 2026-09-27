@@ -145,12 +145,13 @@ end
 
 -- One flight: invisible walkable ramp + open-riser wood treads + black
 -- stringers + a cable railing on the open side(s).
-local function flight(parent, L, x, z0, z1, y0, y1, railSides)
+local function flight(parent, L, x, z0, z1, y0, y1, railSides, rampY0, rampY1)
 	local dir = z1 > z0 and 1 or -1
-	local a = L(x, y0 + 0.5, z0).Position
-	local b = L(x, y1 + 0.5, z1).Position
-	-- thick, slightly wider-than-treads invisible ramp = smooth, reliable walking (players and NPC pathfinding)
-	local ramp = Geo.part(parent, "StairRamp", Vector3.new(FLIGHT_W, 1.2, (b - a).Magnitude + 0.4), CFrame.lookAt((a + b) / 2, b) * CFrame.new(0, -0.6, 0), Pal.Black, M.SmoothPlastic, { Transparency = 1 })
+	-- invisible walkable ramp, flush with the floor it starts on and the
+	-- floor/landing it ends on (players and NPCs walk this, treads are visual)
+	local a = L(x, rampY0 or y0, z0).Position
+	local b = L(x, rampY1 or y1, z1).Position
+	local ramp = Geo.part(parent, "StairRamp", Vector3.new(FLIGHT_W, 1.2, (b - a).Magnitude + 0.2), Geo.lookAt((a + b) / 2, b) * CFrame.new(0, -0.6, 0), Pal.Black, M.SmoothPlastic, { Transparency = 1 })
 	ramp.CastShadow = false
 	local steps = math.floor(y1 - y0 + 0.5)
 	local run = math.abs(z1 - z0) / steps
@@ -175,7 +176,7 @@ local function switchback(parent, L, fromFloor)
 	local y1 = y0 + FH
 	local xA = STAIR_X0 + FLIGHT_W / 2 -- first flight (inner, toward the room)
 	local xB = STAIR_X1 - FLIGHT_W / 2 -- second flight (against the side glass)
-	flight(parent, L, xA, STAIR_Z0, LANDING_Z0, y0, yMid, { [-1] = true, [1] = true })
+	flight(parent, L, xA, STAIR_Z0, LANDING_Z0, y0, yMid, { [-1] = true, [1] = true }, y0, yMid + 0.5)
 	-- landing platform against the back wall
 	local land = Geo.part(parent, "Landing", Vector3.new(FLIGHT_W * 2, 0.5, LANDING_D), L((STAIR_X0 + STAIR_X1) / 2, yMid + 0.25, (LANDING_Z0 + STAIR_Z1) / 2), TREAD_WOOD, M.WoodPlanks)
 	Geo.decorate(Geo.part(parent, "LandingEdge", Vector3.new(FLIGHT_W * 2, 1, 0.3), L((STAIR_X0 + STAIR_X1) / 2, yMid - 0.3, LANDING_Z0 + 0.15), STEEL_BLACK, M.Metal))
@@ -185,7 +186,7 @@ local function switchback(parent, L, fromFloor)
 	for _, x in ipairs({ STAIR_X0 + 0.3, STAIR_X1 - 0.3 }) do
 		Geo.part(parent, "LandingPost", Vector3.new(0.35, FH / 2, 0.35), L(x, y0 + FH / 4, LANDING_Z0 + 0.3), STEEL_BLACK, M.Metal)
 	end
-	flight(parent, L, xB, LANDING_Z0, STAIR_Z0, yMid, y1, { [-1] = true })
+	flight(parent, L, xB, LANDING_Z0, STAIR_Z0, yMid, y1, { [-1] = true }, yMid + 0.5, y1)
 end
 
 -- Glass curtain wall from (x0,z0) to (x1,z1) for one floor. doorAt = distance
@@ -247,7 +248,7 @@ end
 -- (the next floor's stairs would start there once it's bought).
 local function roof(parent, L, level)
 	local top = floorTop(level) + FH
-	slab(parent, L, "RoofSlab", top, nil, Color3.fromRGB(40, 41, 46), M.Concrete)
+	slab(parent, L, "RoofSlab", top, nil, Color3.fromRGB(40, 41, 46), M.Slate)
 	Geo.part(parent, "RoofEdge", Vector3.new(W + 3, 1.6, D + 3), L(0, top + 0.3, 0), DARK_FRAME, M.Metal, { Role = "Wall" })
 	for _, s in ipairs({ -1, 1 }) do
 		Geo.part(parent, "SignLeg", Vector3.new(0.5, 2, 0.5), L(s * 15, top + 1.2, -HD + 1.6), DARK_FRAME, M.Metal)
@@ -399,6 +400,38 @@ function Gym.Build(parent, plotId, plotCF)
 
 	-- whole-building volume (a follower stepping inside is "home")
 	Geo.decorate(Geo.part(model, "GymZone", Vector3.new(W - 2, Gym.H - 1, D - 2), L(0, FY + Gym.H / 2, 0), Pal.Black, M.SmoothPlastic, { Transparency = 1, CanCollide = false }))
+
+	-- ================= navigation points =================
+	-- A fixed route through the building (door -> center aisle -> stairs ->
+	-- landing -> next floor) that NPCs walk point to point; see
+	-- ServerScriptService.GymNav. Invisible, non-colliding, always present.
+	local nav = Geo.folder(model, "Nav")
+	local function navPoint(name, x, y, z)
+		local p = Geo.decorate(Geo.part(nav, name, Vector3.new(1, 1, 1), L(x, y, z), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
+		p.CastShadow = false
+		return p
+	end
+	navPoint("DoorOut", AX, FY, -HD - 4)
+	navPoint("Lobby", AX, FY, -HD + 6)
+	local stairPathZ = STAIR_Z0 - 2.5 -- the aisle that runs from the center aisle to the stairs
+	local xA, xB = STAIR_X0 + FLIGHT_W / 2, STAIR_X1 - FLIGHT_W / 2
+	for f = 1, Gym.FLOORS do
+		navPoint("Cross" .. f, AX, floorTop(f), stairPathZ)
+		if f < Gym.FLOORS then
+			local yMid = floorTop(f) + FH / 2 + 0.5
+			navPoint("StairFoot" .. f, xA, floorTop(f), stairPathZ)
+			navPoint("LandA" .. f, xA, yMid, LANDING_Z0 + 2.5)
+			navPoint("LandB" .. f, xB, yMid, LANDING_Z0 + 2.5)
+			navPoint("StairTop" .. (f + 1), xB, floorTop(f + 1), stairPathZ)
+		end
+	end
+	-- floor 3 has no center aisle: step off the stairs behind the benches and
+	-- use the lane between the machine columns
+	navPoint("F3Turn", xB, floorTop(3), STAIR_Z0 - 1)
+	navPoint("F3Lane", 9.5, floorTop(3), STAIR_Z0 - 1)
+	nav:SetAttribute("FloorY", FY)
+	nav:SetAttribute("FloorH", FH)
+	nav:SetAttribute("AisleX", AX)
 
 	-- ================= stations =================
 	for f = 1, Gym.FLOORS do
