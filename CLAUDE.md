@@ -11,11 +11,16 @@ must be delivered as **one command-bar paste**:
    Map/geometry changes must ALSO be written as live edits in that script's
    `code` block (the owner's place already has the old map; rebuilding it
    there is not an option). Keep it idempotent: safe to paste twice.
+   Builders shared by the map and the patch (pure Roblox API, e.g.
+   `tools/map/Portal.luau`, `tools/map/Walls.luau`) go in `PATCH_MODULES`;
+   the paste installs them as temporary ModuleScripts and requires them.
+   Moves are guarded by map attributes (e.g. `GymWarsMap.LotX`).
 3. `python3 tools/snippets/make_update.py` -> `tools/snippets/update_command.lua`.
-4. Test it offline: run the command with Lune against an older build
-   (`git show <old-commit>:build/GymWars.rbxlx`), with a correct `CFrame.lookAt`
-   injected (Lune's is broken for sloped directions), then run
-   `tools/staircheck.luau` / `tools/navcheck.luau` on the patched place.
+4. Test it offline: `lune run tools/patchcheck <old.rbxlx> <patched.rbxlx>`
+   (old = `git show <old-commit>:build/GymWars.rbxlx`; it pastes twice to
+   prove idempotency), then run `tools/staircheck.luau` /
+   `tools/navcheck.luau` pointed at the patched place. No GetPivot/PivotTo
+   or Part.Position in patch code (Lune lacks them); shift parts directly.
 5. Send `update_command.lua` with SendUserFile and the same short steps:
    stop Play -> open file, Cmd+A, Cmd+C -> paste in the command bar -> Enter
    -> check Output for "GYM WARS UPDATED" -> Cmd+S -> Play.

@@ -260,25 +260,6 @@ local function burst(root, rarity, count)
 	Debris:AddItem(att, 2)
 end
 
-local function waitForLanding(root, callback)
-	task.spawn(function()
-		local t0 = os.clock()
-		local fell = false
-		while root.Parent and os.clock() - t0 < 4 do
-			local vy = root.AssemblyLinearVelocity.Y
-			if vy < -10 then
-				fell = true
-			elseif fell and vy > -2 then
-				break
-			end
-			task.wait()
-		end
-		if root.Parent then
-			callback()
-		end
-	end)
-end
-
 -- ----------------------------------------------------------------------
 -- Events from the server
 -- ----------------------------------------------------------------------
@@ -313,7 +294,11 @@ FxRemote.OnClientEvent:Connect(function(kind, data)
 		if data.SpawnFx == "GoldenEra" then
 			goldenWorld(6)
 		elseif data.SpawnFx == "HeavyLanding" and root then
-			waitForLanding(root, function()
+			-- the ground shakes as he stomps out of the gate
+			task.delay(1.2, function()
+				if not root.Parent then
+					return
+				end
 				playSound({ Id = "rbxasset://sounds/action_jump_land.mp3", Volume = 1, Pitch = 0.45 }, root)
 				playSound({ Id = "rbxasset://sounds/electronicpingshort.wav", Volume = 0.7, Pitch = 0.3 }, root)
 				shockwave(root.Position - Vector3.new(0, 3, 0), rarity.Color, 30)

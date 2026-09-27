@@ -21,6 +21,13 @@ FILES = [
     "src/StarterPlayerScripts/CharacterEffects.client.luau",
     "src/StarterPlayerScripts/GymAnimator.client.luau",
     "src/StarterPlayerScripts/MeshCharacters.client.luau",
+    "src/StarterPlayerScripts/PortalFx.client.luau",
+]
+
+# builders shared with the map generator, installed as temporary modules
+PATCH_MODULES = [
+    ("Portal", "tools/map/Portal.luau"),
+    ("Walls", "tools/map/Walls.luau"),
 ]
 
 def lstr(s):
@@ -59,6 +66,47 @@ local belt=map:FindFirstChild("Belt")
 if belt then for _,d in ipairs(belt:GetDescendants()) do if d:IsA("BasePart") and (d.Name=="BeltTrack" or d.Name=="BeltSkirt" or d.Name=="BeltGlow" or d.Name=="RailLeft" or d.Name=="RailRight") then d:Destroy() n+=1 end end local ch=belt:FindFirstChild("Chevrons") if ch then ch:Destroy() end end
 for _,root in ipairs({map,SS:FindFirstChild("HiddenGymFloors")}) do if root then for _,d in ipairs(root:GetDescendants()) do if d:IsA("BasePart") then if d.Name=="RoofSlab" then d.Material=Enum.Material.Slate elseif d.Name=="TunnelLeft" or d.Name=="TunnelRight" or d.Name=="TunnelTop" then d.Material=Enum.Material.Metal end end end end end
 local sp=workspace:FindFirstChild("SpawnLocation") if sp then sp.Color=Color3.fromRGB(88,148,66) sp.Material=Enum.Material.Grass end
+local tmp=SS:FindFirstChild("_GymWarsPatch") if tmp then tmp:Destroy() end
+tmp=Instance.new("Folder") tmp.Name="_GymWarsPatch" tmp.Parent=SS
+local M={}
+for _,pm in ipairs(PATCH) do local ms=Instance.new("ModuleScript") ms.Name=pm[1] ms.Source=pm[2] ms.Parent=tmp M[pm[1]]=require(ms) end
+local LOTX,HX,HZ=118,176,178
+local env=map:FindFirstChild("Environment")
+local plotsF=map:FindFirstChild("Plots")
+local dx=LOTX-(map:GetAttribute("LotX") or 106)
+local function anyPos(c) if c:IsA("BasePart") then return c.CFrame.Position end for _,d in ipairs(c:GetDescendants()) do if d:IsA("BasePart") then return d.CFrame.Position end end return nil end
+local function shift(c,off) if c:IsA("BasePart") then c.CFrame=c.CFrame+off end for _,d in ipairs(c:GetDescendants()) do if d:IsA("BasePart") then d.CFrame=d.CFrame+off end end if c:IsA("Model") then pcall(function() c.WorldPivot=c.WorldPivot+off end) end end
+if dx~=0 and plotsF then
+for _,plot in ipairs(plotsF:GetChildren()) do
+local fl=plot:FindFirstChild("Floor")
+if fl then
+local side=fl.CFrame.Position.X>0 and 1 or -1
+local off=Vector3.new(side*dx,0,0)
+shift(plot,off)
+local hid=SS:FindFirstChild("HiddenGymFloors") and SS.HiddenGymFloors:FindFirstChild(plot.Name)
+if hid then for _,d in ipairs(hid:GetDescendants()) do if d:IsA("BasePart") then d.CFrame=d.CFrame+off end end end
+end
+end
+local keep={Ground=true,RedCarpet=true,CarpetEdge=true}
+local movers={}
+if env then for _,c in ipairs(env:GetChildren()) do table.insert(movers,c) end local nat=env:FindFirstChild("Nature") if nat then for _,c in ipairs(nat:GetChildren()) do table.insert(movers,c) end end end
+for _,c in ipairs(movers) do if (c:IsA("BasePart") or c:IsA("Model")) and not keep[c.Name] then local pos=anyPos(c) if pos and math.abs(pos.X)>=30 then shift(c,Vector3.new((pos.X>0 and 1 or -1)*dx,0,0)) end end end
+map:SetAttribute("LotX",LOTX)
+end
+if env then
+for _,c in ipairs(env:GetChildren()) do if c.Name=="StoneWall" or c.Name=="WallCap" or c.Name=="Hedge" or c.Name=="GatePillar" or c.Name=="PillarCap" or c.Name=="PillarLamp" or c.Name=="WorldWalls" then c:Destroy() end end
+local g=env:FindFirstChild("Ground") if g then g.Size=Vector3.new(HX*2+60,g.Size.Y,g.Size.Z) end
+M.Walls.Build(env,HX,HZ,30)
+end
+if belt then
+for _,nm in ipairs({"DropTunnel","ExitTunnel","DropGate","ExitGate"}) do local o=belt:FindFirstChild(nm) if o then o:Destroy() end end
+M.Portal.Build(belt,"DropGate",CFrame.new(0,0,-160)*CFrame.Angles(0,math.pi,0),Color3.fromRGB(40,150,255),"INFLUENCER DROP","\226\152\133 NOW WALKING THE RED CARPET \226\152\133")
+M.Portal.Build(belt,"ExitGate",CFrame.new(0,0,160),Color3.fromRGB(255,50,70),"LAST CHANCE","\226\152\133 BUY THEM BEFORE THEY'RE GONE \226\152\133")
+local dp=belt:FindFirstChild("DropPoint") if dp then dp.CFrame=CFrame.new(0,3.5,-155) end
+local bs=belt:FindFirstChild("BeltStart") if bs then bs.CFrame=CFrame.new(0,3,-154) end
+local be=belt:FindFirstChild("BeltEnd") if be then be.CFrame=CFrame.new(0,3,158) end
+end
+tmp:Destroy()
 local FY,FH=0.4,16
 local function ft(f) return FY+(f-1)*FH end
 local function mk(parent,name,size,cf,visible) local p=Instance.new("Part") p.Name=name p.Anchored=true p.Size=size p.CFrame=cf p.Transparency=1 p.CastShadow=false p.Material=Enum.Material.SmoothPlastic if not visible then p.CanCollide=false p.CanTouch=false p.CanQuery=false end p.Parent=parent return p end
@@ -109,11 +157,12 @@ if not s then s=Instance.new(e[2]) s.Name=name s.Parent=parent end
 s.Source=e[3]
 installed+=1
 end
-print(("GYM WARS UPDATED: %d scripts, %d concrete/conveyor parts removed, %d stair ramps rebuilt. Press Ctrl/Cmd+S, then Play."):format(installed,n,ramps))
+print(("GYM WARS UPDATED: %d scripts, new walls + gates, gyms at %d studs from the carpet, %d stair ramps. Press Ctrl/Cmd+S, then Play."):format(installed,LOTX,ramps))
 '''
 lines = [l.strip() for l in code.strip().splitlines() if l.strip()]
 body = " ".join(lines)
-cmd = "local FILES={" + ",".join(entries) + "} do " + body + " end"
+patch = ",".join("{%s,%s}" % (lstr(n), lstr(open(os.path.join(ROOT, f), encoding="utf-8").read())) for n, f in PATCH_MODULES)
+cmd = "local FILES={" + ",".join(entries) + "} local PATCH={" + patch + "} do " + body + " end"
 out = os.path.join(ROOT, "tools", "snippets", "update_command.lua")
 open(out, "w", encoding="utf-8").write(cmd + "\n")
 print(out, len(cmd), "chars")

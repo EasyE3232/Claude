@@ -231,10 +231,7 @@ function BeltService.Step(dt)
 			local char = Characters.Roll(rng)
 			local rarity = Characters.GetRarity(char.Rarity)
 			local drop = nextDropPoint()
-			local pos = drop.Position + Vector3.new(rng:NextNumber(-0.8, 0.8), 0, 0)
-			if char.SpawnFx == "HeavyLanding" then
-				pos += Vector3.new(0, 22, 14) -- drops from high up (clear of the tunnel roof) and slams onto the belt
-			end
+			local pos = drop.Position -- everyone walks out of the gate (no sky drops)
 			-- avatar creation can yield (asset loading), so don't block Heartbeat
 			task.spawn(function()
 				local rec = InfluencerService.Spawn(char, CFrame.new(pos))

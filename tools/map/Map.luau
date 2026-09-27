@@ -12,6 +12,8 @@
 
 local Geo = require("tools/map/Geo")
 local Gym = require("tools/map/Gym")
+local Portal = require("tools/map/Portal")
+local Walls = require("tools/map/Walls")
 
 local Map = {}
 local Pal = Geo.Palette
@@ -19,18 +21,18 @@ local M = Enum.Material
 local rad = math.rad
 
 Map.LOT_Z = { -114, -38, 38, 114 } -- 76 studs apart (20-stud gaps between gyms)
-Map.LOT_X = 106 -- gym center from the carpet center line (front door at 70: ~50-stud front yard)
-Map.HALF_X = 162
+Map.LOT_X = 118 -- gym center from the carpet center line (front door at 82: ~62-stud front yard)
+Map.HALF_X = 176
 Map.HALF_Z = 178
 Map.BELT_Z0 = -158
 Map.BELT_Z1 = 158
+Map.WALL_HEIGHT = 30
 Map.BELT_TOP = 1.0
 Map.BELT_WIDTH = 7
 Map.CARPET_HALF = 13
 
 local CARPET = Color3.fromRGB(128, 16, 26)
 local BRASS = Color3.fromRGB(176, 146, 86)
-local STONE = Color3.fromRGB(118, 114, 108)
 
 -- greens that read as real foliage under Future lighting
 local LEAF = {
@@ -163,30 +165,6 @@ local function lamp(parent, pos, faceDir)
 	return m
 end
 
--- stone wall with a trimmed hedge on top
-local function wallRun(parent, a, b)
-	local len = (b - a).Magnitude
-	local cf = Geo.lookAt((a + b) / 2, b)
-	Geo.part(parent, "StoneWall", Vector3.new(3, 3, len), cf + Vector3.new(0, 1.5, 0), STONE, M.Cobblestone)
-	Geo.part(parent, "WallCap", Vector3.new(3.6, 0.5, len), cf + Vector3.new(0, 3.25, 0), Color3.fromRGB(140, 136, 128), M.Slate)
-	Geo.part(parent, "Hedge", Vector3.new(3, 5, len), cf + Vector3.new(0, 6, 0), Color3.fromRGB(50, 80, 38), M.LeafyGrass)
-end
-
-local function tunnel(parent, name, z, dir, label)
-	local cf = CFrame.new(0, 0, z)
-	local m = Geo.model(parent, name)
-	Geo.part(m, "TunnelLeft", Vector3.new(3, 12, 14), cf * CFrame.new(-7.5, 6, 0), Pal.FrameDark, M.Metal)
-	Geo.part(m, "TunnelRight", Vector3.new(3, 12, 14), cf * CFrame.new(7.5, 6, 0), Pal.FrameDark, M.Metal)
-	Geo.part(m, "TunnelTop", Vector3.new(18, 3, 14), cf * CFrame.new(0, 13.5, 0), Pal.FrameDark, M.Metal)
-	Geo.part(m, "TunnelBack", Vector3.new(12, 12, 1), cf * CFrame.new(0, 6, dir * 6.5), Pal.Black, M.SmoothPlastic)
-	local face = -dir
-	Geo.decorate(Geo.part(m, "TunnelGlow", Vector3.new(12, 0.3, 0.3), cf * CFrame.new(0, 11.8, face * 7.1), Pal.Accent, M.Neon, { Role = "MapAccent" }))
-	local sign = Geo.part(m, "TunnelSign", Vector3.new(16, 3, 0.4), cf * CFrame.new(0, 13.5, face * 7.3), Pal.Black, M.SmoothPlastic)
-	Geo.surfaceText(sign, face < 0 and Enum.NormalId.Front or Enum.NormalId.Back, label, { Color = Color3.fromRGB(255, 255, 255), PPS = 20 })
-	Geo.decorate(Geo.part(m, "Curtain", Vector3.new(11, 10, 0.2), cf * CFrame.new(0, 6, face * 5.5), Color3.fromRGB(10, 10, 12), M.Fabric, { Transparency = 0.15 }))
-	return m
-end
-
 -- ----------------------------------------------------------------------
 function Map.Build(workspace)
 	local root = Instance.new("Folder")
@@ -199,17 +177,8 @@ function Map.Build(workspace)
 	-- ground
 	Geo.part(env, "Ground", Vector3.new(hx * 2 + 60, 4, hz * 2 + 60), CFrame.new(0, -2, 0), Color3.fromRGB(88, 148, 66), M.Grass)
 
-	-- stone + hedge boundary with a gate at each end
-	local gateHalf = 20
-	for _, s in ipairs({ -1, 1 }) do
-		wallRun(env, Vector3.new(s * (hx + 1.5), 0, -hz - 1.5), Vector3.new(s * (hx + 1.5), 0, hz + 1.5))
-		for _, sz in ipairs({ -1, 1 }) do
-			wallRun(env, Vector3.new(s * gateHalf, 0, sz * (hz + 1.5)), Vector3.new(s * (hx + 1.5), 0, sz * (hz + 1.5)))
-			Geo.part(env, "GatePillar", Vector3.new(4, 12, 4), CFrame.new(s * gateHalf, 6, sz * (hz + 1.5)), STONE, M.Cobblestone)
-			Geo.part(env, "PillarCap", Vector3.new(4.8, 0.8, 4.8), CFrame.new(s * gateHalf, 12.4, sz * (hz + 1.5)), Color3.fromRGB(140, 136, 128), M.Slate)
-			Geo.decorate(Geo.part(env, "PillarLamp", Vector3.new(1.4, 1.8, 1.4), CFrame.new(s * gateHalf, 13.7, sz * (hz + 1.5)), Color3.fromRGB(255, 238, 205), M.Neon))
-		end
-	end
+	-- tall fieldstone boundary wall all the way around
+	Walls.Build(env, hx, hz, Map.WALL_HEIGHT)
 
 	-- red carpet boulevard with a slim brass edge, straight onto the grass
 	local carpetLen = hz * 2 - 16
@@ -223,12 +192,13 @@ function Map.Build(workspace)
 	-- these invisible markers define that line (BeltService walks them along it).
 	local belt = Geo.folder(root, "Belt")
 	Geo.decorate(Geo.part(belt, "BeltStart", Vector3.new(1, 1, 1), CFrame.new(0, 3, Map.BELT_Z0 + 4), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
-	Geo.decorate(Geo.part(belt, "BeltEnd", Vector3.new(1, 1, 1), CFrame.new(0, 3, Map.BELT_Z1 - 4), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
+	Geo.decorate(Geo.part(belt, "BeltEnd", Vector3.new(1, 1, 1), CFrame.new(0, 3, Map.BELT_Z1), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
 	local startPoint = Geo.decorate(Geo.part(belt, "DropPoint", Vector3.new(1, 1, 1), CFrame.new(0, 3.5, Map.BELT_Z0 + 3), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
 	startPoint:SetAttribute("DropPoint", true)
 
-	tunnel(belt, "DropTunnel", Map.BELT_Z0 - 2, -1, "INFLUENCER DROP")
-	tunnel(belt, "ExitTunnel", Map.BELT_Z1 + 2, 1, "LAST CHANCE")
+	-- the stage gates characters walk out of / vanish into
+	Portal.Build(belt, "DropGate", CFrame.new(0, 0, Map.BELT_Z0 - 2) * CFrame.Angles(0, math.pi, 0), Color3.fromRGB(40, 150, 255), "INFLUENCER DROP", "★ NOW WALKING THE RED CARPET ★")
+	Portal.Build(belt, "ExitGate", CFrame.new(0, 0, Map.BELT_Z1 + 2), Color3.fromRGB(255, 50, 70), "LAST CHANCE", "★ BUY THEM BEFORE THEY'RE GONE ★")
 
 	-- ================= lots =================
 	local plots = Geo.folder(root, "Plots")
