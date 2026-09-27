@@ -586,14 +586,33 @@ function CharacterLooks.Build(char, opts)
 	local rarity = Characters.GetRarity(char.Rarity)
 	-- 1) a real rigged model (uploaded asset or .rbxm), sized like the rest
 	local buildH = (char.Look and char.Look.Build and char.Look.Build.Height) or 1
-	local rigged = CharacterModels.Build(char, 5.95 * buildH * StationSpecs.SCALE)
-	if rigged then
-		rigged.Name = char.DisplayName
-		local model = NpcService.CreateRig({ Name = char.DisplayName, Model = rigged, Face = false })
+	local height = 5.95 * buildH * StationSpecs.SCALE
+	local custom, kind = CharacterModels.Build(char, height)
+	local meshData = char.Mesh and MeshCharacter.Get(char.Mesh)
+	if custom and kind == "Rig" then
+		custom.Name = char.DisplayName
+		local model = NpcService.CreateRig({ Name = char.DisplayName, Model = custom, Face = false })
+		return CharacterLooks._finish(model, char, rarity)
+	elseif custom then
+		-- plain imported mesh: ride an invisible rig of the right size
+		local rigModel
+		if meshData then
+			rigModel = MeshCharacter.BuildRig(meshData)
+			rigModel:SetAttribute("MeshCharacter", nil) -- the placed model is the visual
+		end
+		local model = NpcService.CreateRig({ Name = char.DisplayName, Model = rigModel, Face = false, Height = buildH })
+		pcall(function()
+			model:ScaleTo(model:GetScale() * height / select(2, model:GetBoundingBox()).Y)
+		end)
+		for _, d in ipairs(model:GetDescendants()) do
+			if d:IsA("Accessory") or d:IsA("Decal") then
+				d:Destroy()
+			end
+		end
+		CharacterModels.AttachStatic(model, custom, char)
 		return CharacterLooks._finish(model, char, rarity)
 	end
 	-- 2) a baked Meshy mesh (tools/meshy/import.py)
-	local meshData = char.Mesh and MeshCharacter.Get(char.Mesh)
 	if meshData then
 		-- model-based character: invisible rig here, clients add the mesh
 		local model = NpcService.CreateRig({ Name = char.DisplayName, Model = MeshCharacter.BuildRig(meshData), Face = false })

@@ -19,10 +19,12 @@ local DefenseService = require(SSS.DefenseService)
 local NpcService = require(SSS.NpcService)
 local EnvironmentService = require(SSS.EnvironmentService)
 local Notify = require(SSS.Notify)
+local CharacterModels = require(SSS.CharacterModels)
 
 -- ----------------------------------------------------------------------
 -- Init order matters: plots first (everything hangs off them)
 -- ----------------------------------------------------------------------
+CharacterModels.Init() -- before anything spawns
 EnvironmentService.Init()
 NpcService.Init()
 PlotService.Init()

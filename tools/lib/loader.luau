@@ -46,6 +46,7 @@ local function makeEnv(dir)
 	}
 	env.require = requireAny
 	env.game = GAME
+	env.workspace = GAME and GAME.FindFirstChildOfClass and GAME:FindFirstChildOfClass("Workspace") or nil
 	env.typeof = typeof
 	return env
 end
@@ -57,6 +58,14 @@ function requireAny(ref)
 			return require(ref)
 		end
 		path = ROOT .. "/" .. ref .. ".luau"
+	elseif typeof(ref) == "Instance" then
+		-- a ModuleScript inside a loaded place: run its Source
+		local key = "instance:" .. ref:GetFullName()
+		if cache[key] == nil then
+			local fn = luau.load(ref.Source, { debugName = key, environment = makeEnv(ROOT) })
+			cache[key] = fn()
+		end
+		return cache[key]
 	else
 		path = ref.__path
 	end

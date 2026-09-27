@@ -483,6 +483,7 @@ Characters.LIST = {
 		Rarity = "GOAT", Price = 20e12, IncomePerSecond = 3.35e9, SpawnWeight = 27, ModelName = "RonnieCurlman",
 		-- Uploaded rigged model: paste its Roblox asset ID here (used first).
 		AssetId = nil,
+		ModelYaw = 0, -- degrees; set to 180 if a placed model rides the belt backwards
 		Mesh = "RonnieCurlman", -- baked Meshy model (MeshAssets/RonnieCurlman), used if no AssetId
 		Look = { Skin = C(107, 63, 42), Hair = { Style = "Bald", Color = HAIR.Black },
 			Top = { Style = "Tank", Color = C(26, 26, 26) }, Bottom = { Style = "Shorts", Color = C(31, 31, 31) },

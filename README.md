@@ -65,6 +65,13 @@ either upload it and put its asset ID in the character's `AssetId`, or
 right-click > Save to File and drop the `.rbxm` in `tools/models/<ModelName>.rbxm`.
 The game uses that model first (see `ServerScriptService/CharacterModels.luau`).
 
+**Easiest: place it in the world.** Put the model anywhere in the place
+(Workspace is fine) with the character's name in its name, e.g.
+`RonnieCurlman` or `Meshy_AI_Ronnie_Curlman_Darker`. At server start
+`CharacterModels.Init()` moves it into ServerStorage and the conveyor spawns
+copies of it. A rigged R15 model animates fully; a plain mesh rides an
+invisible rig (turn it with `ModelYaw` if it faces backwards).
+
 **Without a rig:** the baked route below.
 
 Any character can use an imported 3D model instead of the part-built look:
