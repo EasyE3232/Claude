@@ -26,7 +26,7 @@ FILES = [
 
 # builders shared with the map generator, installed as temporary modules
 PATCH_MODULES = [
-    ("Portal", "tools/map/Portal.luau"),
+    ("Gate", "tools/map/Gate.luau"),
     ("Walls", "tools/map/Walls.luau"),
 ]
 
@@ -96,15 +96,16 @@ end
 if env then
 for _,c in ipairs(env:GetChildren()) do if c.Name=="StoneWall" or c.Name=="WallCap" or c.Name=="Hedge" or c.Name=="GatePillar" or c.Name=="PillarCap" or c.Name=="PillarLamp" or c.Name=="WorldWalls" then c:Destroy() end end
 local g=env:FindFirstChild("Ground") if g then g.Size=Vector3.new(HX*2+60,g.Size.Y,g.Size.Z) end
-M.Walls.Build(env,HX,HZ,30)
+M.Walls.Build(env,HX,HZ,30,{Width=12,Height=18})
+for _,c in ipairs(env:GetChildren()) do if c:IsA("BasePart") and (c.Name=="RedCarpet" or c.Name=="CarpetEdge") then c.Size=Vector3.new(c.Size.X,c.Size.Y,HZ*2) end end
 end
 if belt then
 for _,nm in ipairs({"DropTunnel","ExitTunnel","DropGate","ExitGate"}) do local o=belt:FindFirstChild(nm) if o then o:Destroy() end end
-M.Portal.Build(belt,"DropGate",CFrame.new(0,0,-160)*CFrame.Angles(0,math.pi,0),Color3.fromRGB(40,150,255),"INFLUENCER DROP","\226\152\133 NOW WALKING THE RED CARPET \226\152\133")
-M.Portal.Build(belt,"ExitGate",CFrame.new(0,0,160),Color3.fromRGB(255,50,70),"LAST CHANCE","\226\152\133 BUY THEM BEFORE THEY'RE GONE \226\152\133")
-local dp=belt:FindFirstChild("DropPoint") if dp then dp.CFrame=CFrame.new(0,3.5,-155) end
-local bs=belt:FindFirstChild("BeltStart") if bs then bs.CFrame=CFrame.new(0,3,-154) end
-local be=belt:FindFirstChild("BeltEnd") if be then be.CFrame=CFrame.new(0,3,158) end
+M.Gate.Build(belt,"DropGate",CFrame.new(0,0,-HZ)*CFrame.Angles(0,math.pi,0),Color3.fromRGB(60,170,255),"INFLUENCER DROP",12,18,4)
+M.Gate.Build(belt,"ExitGate",CFrame.new(0,0,HZ),Color3.fromRGB(255,70,90),"LAST CHANCE",12,18,4)
+local dp=belt:FindFirstChild("DropPoint") if dp then dp.CFrame=CFrame.new(0,3.5,-HZ-1) end
+local bs=belt:FindFirstChild("BeltStart") if bs then bs.CFrame=CFrame.new(0,3,-HZ+1) end
+local be=belt:FindFirstChild("BeltEnd") if be then be.CFrame=CFrame.new(0,3,HZ+1.2) end
 end
 tmp:Destroy()
 local FY,FH=0.4,16
@@ -157,7 +158,7 @@ if not s then s=Instance.new(e[2]) s.Name=name s.Parent=parent end
 s.Source=e[3]
 installed+=1
 end
-print(("GYM WARS UPDATED: %d scripts, new walls + gates, gyms at %d studs from the carpet, %d stair ramps. Press Ctrl/Cmd+S, then Play."):format(installed,LOTX,ramps))
+print(("GYM WARS UPDATED: %d scripts, wall teleporters, gyms at %d studs from the carpet, %d stair ramps. Press Ctrl/Cmd+S, then Play."):format(installed,LOTX,ramps))
 '''
 lines = [l.strip() for l in code.strip().splitlines() if l.strip()]
 body = " ".join(lines)

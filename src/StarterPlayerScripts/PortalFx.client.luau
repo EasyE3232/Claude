@@ -6,13 +6,14 @@
 	  Pulse    the glowing portal disc breathing
 	  Curtain  light-curtain slats shimmering
 	  Sweep    searchlights sweeping the sky
+	  Scan     a light bar gliding up and down the portal plane
 ]]
 
 local RunService = game:GetService("RunService")
 
 local map = workspace:WaitForChild("GymWarsMap")
 
-local chase, pulse, curtain, sweep = {}, {}, {}, {}
+local chase, pulse, curtain, sweep, scan = {}, {}, {}, {}, {}
 local BULB_ON = Color3.fromRGB(255, 240, 200)
 local BULB_OFF = Color3.fromRGB(90, 70, 40)
 
@@ -29,6 +30,11 @@ local function register(p)
 		table.insert(curtain, { Part = p, Index = p:GetAttribute("Index") or 0 })
 	elseif fx == "Sweep" then
 		table.insert(sweep, { Part = p, Rest = p.CFrame, Phase = p:GetAttribute("Phase") or 0 })
+	elseif fx == "Scan" then
+		-- remember the bar's frame at the bottom of its travel
+		local low, high = p:GetAttribute("Low") or 0, p:GetAttribute("High") or 10
+		local mid = (low + high) / 2
+		table.insert(scan, { Part = p, Base = p.CFrame * CFrame.new(0, low - mid, 0), Travel = high - low })
 	end
 end
 
@@ -62,6 +68,13 @@ RunService.RenderStepped:Connect(function()
 
 	for _, c in ipairs(curtain) do
 		c.Part.Transparency = 0.62 + 0.3 * (0.5 + 0.5 * math.sin(t * 5 + c.Index * 0.8))
+	end
+
+	for _, b in ipairs(scan) do
+		-- smooth ease up and down, a slow modern sweep
+		local k = 0.5 - 0.5 * math.cos(t * 0.9)
+		b.Part.CFrame = b.Base * CFrame.new(0, b.Travel * k, 0)
+		b.Part.Transparency = 0.15 + 0.35 * math.abs(k - 0.5)
 	end
 
 	for _, s in ipairs(sweep) do

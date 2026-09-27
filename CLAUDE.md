@@ -12,7 +12,7 @@ must be delivered as **one command-bar paste**:
    `code` block (the owner's place already has the old map; rebuilding it
    there is not an option). Keep it idempotent: safe to paste twice.
    Builders shared by the map and the patch (pure Roblox API, e.g.
-   `tools/map/Portal.luau`, `tools/map/Walls.luau`) go in `PATCH_MODULES`;
+   `tools/map/Gate.luau`, `tools/map/Walls.luau`) go in `PATCH_MODULES`;
    the paste installs them as temporary ModuleScripts and requires them.
    Moves are guarded by map attributes (e.g. `GymWarsMap.LotX`).
 3. `python3 tools/snippets/make_update.py` -> `tools/snippets/update_command.lua`.

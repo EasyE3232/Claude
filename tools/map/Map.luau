@@ -12,7 +12,7 @@
 
 local Geo = require("tools/map/Geo")
 local Gym = require("tools/map/Gym")
-local Portal = require("tools/map/Portal")
+local Gate = require("tools/map/Gate")
 local Walls = require("tools/map/Walls")
 
 local Map = {}
@@ -27,6 +27,8 @@ Map.HALF_Z = 178
 Map.BELT_Z0 = -158
 Map.BELT_Z1 = 158
 Map.WALL_HEIGHT = 30
+Map.GATE_W = 12 -- teleport doorway in each end wall
+Map.GATE_H = 18
 Map.BELT_TOP = 1.0
 Map.BELT_WIDTH = 7
 Map.CARPET_HALF = 13
@@ -178,10 +180,10 @@ function Map.Build(workspace)
 	Geo.part(env, "Ground", Vector3.new(hx * 2 + 60, 4, hz * 2 + 60), CFrame.new(0, -2, 0), Color3.fromRGB(88, 148, 66), M.Grass)
 
 	-- tall fieldstone boundary wall all the way around
-	Walls.Build(env, hx, hz, Map.WALL_HEIGHT)
+	Walls.Build(env, hx, hz, Map.WALL_HEIGHT, { Width = Map.GATE_W, Height = Map.GATE_H })
 
 	-- red carpet boulevard with a slim brass edge, straight onto the grass
-	local carpetLen = hz * 2 - 16
+	local carpetLen = hz * 2 -- wall to wall, gate to gate
 	Geo.part(env, "RedCarpet", Vector3.new(Map.CARPET_HALF * 2, 0.12, carpetLen), CFrame.new(0, 0.06, 0), CARPET, M.Carpet)
 	for _, s in ipairs({ -1, 1 }) do
 		Geo.decorate(Geo.part(env, "CarpetEdge", Vector3.new(0.3, 0.14, carpetLen), CFrame.new(s * (Map.CARPET_HALF + 0.15), 0.07, 0), BRASS, M.Metal))
@@ -191,14 +193,14 @@ function Map.Build(workspace)
 	-- Characters walk straight down the carpet from the drop tunnel to the exit;
 	-- these invisible markers define that line (BeltService walks them along it).
 	local belt = Geo.folder(root, "Belt")
-	Geo.decorate(Geo.part(belt, "BeltStart", Vector3.new(1, 1, 1), CFrame.new(0, 3, Map.BELT_Z0 + 4), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
-	Geo.decorate(Geo.part(belt, "BeltEnd", Vector3.new(1, 1, 1), CFrame.new(0, 3, Map.BELT_Z1), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
-	local startPoint = Geo.decorate(Geo.part(belt, "DropPoint", Vector3.new(1, 1, 1), CFrame.new(0, 3.5, Map.BELT_Z0 + 3), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
+	Geo.decorate(Geo.part(belt, "BeltStart", Vector3.new(1, 1, 1), CFrame.new(0, 3, -hz + 1), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
+	Geo.decorate(Geo.part(belt, "BeltEnd", Vector3.new(1, 1, 1), CFrame.new(0, 3, hz + 1.2), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
+	local startPoint = Geo.decorate(Geo.part(belt, "DropPoint", Vector3.new(1, 1, 1), CFrame.new(0, 3.5, -hz - 1), Pal.Black, M.SmoothPlastic, { Transparency = 1 }))
 	startPoint:SetAttribute("DropPoint", true)
 
-	-- the stage gates characters walk out of / vanish into
-	Portal.Build(belt, "DropGate", CFrame.new(0, 0, Map.BELT_Z0 - 2) * CFrame.Angles(0, math.pi, 0), Color3.fromRGB(40, 150, 255), "INFLUENCER DROP", "★ NOW WALKING THE RED CARPET ★")
-	Portal.Build(belt, "ExitGate", CFrame.new(0, 0, Map.BELT_Z1 + 2), Color3.fromRGB(255, 50, 70), "LAST CHANCE", "★ BUY THEM BEFORE THEY'RE GONE ★")
+	-- the teleport gates set into the end walls: walk out of one, vanish into the other
+	Gate.Build(belt, "DropGate", CFrame.new(0, 0, -hz) * CFrame.Angles(0, math.pi, 0), Color3.fromRGB(60, 170, 255), "INFLUENCER DROP", Map.GATE_W, Map.GATE_H, 4)
+	Gate.Build(belt, "ExitGate", CFrame.new(0, 0, hz), Color3.fromRGB(255, 70, 90), "LAST CHANCE", Map.GATE_W, Map.GATE_H, 4)
 
 	-- ================= lots =================
 	local plots = Geo.folder(root, "Plots")
