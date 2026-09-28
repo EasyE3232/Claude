@@ -4,8 +4,7 @@
 	client so it's smooth every frame (the server only moves them). Models are
 	flagged by the server with the "Loco" attribute (false while working out).
 
-	  - Rthro idle / walk / run (heavier, more natural gait), falling back to
-	    the classic R15 set if those don't load
+	  - Roblox's R15 idle / walk / run (the same clips for everyone)
 	  - Walk/run blended and speed-matched to how fast they move
 	  - Bodybuilder swagger: arms carried out from the body (more for bigger
 	    rarities) so big arms don't clip through the lats and thighs
@@ -13,10 +12,7 @@
 
 local RunService = game:GetService("RunService")
 
-local SETS = {
-	Rthro = { Idle = "rbxassetid://2510196951", Walk = "rbxassetid://2510202577", Run = "rbxassetid://2510198475" },
-	Classic = { Idle = "rbxassetid://507766388", Walk = "rbxassetid://507777826", Run = "rbxassetid://507767714" },
-}
+local CLIPS = { Idle = "rbxassetid://507766388", Walk = "rbxassetid://507777826", Run = "rbxassetid://507767714" }
 
 local rigs = {} -- [model] = state
 
@@ -38,15 +34,6 @@ local function loadSet(animator, ids)
 	return tracks
 end
 
-local function loaded(tracks)
-	for _, t in pairs(tracks) do
-		if t.Length <= 0 then
-			return false
-		end
-	end
-	return true
-end
-
 local function stopAll(state)
 	if state.Tracks then
 		for _, t in pairs(state.Tracks) do
@@ -64,37 +51,29 @@ local function findJoint(model, name)
 	return nil
 end
 
+-- returns true once the model is being animated (false = try again later)
 local function track(model)
 	if rigs[model] then
-		return
+		return true
 	end
 	local hum = model:FindFirstChildOfClass("Humanoid")
-	local animator = hum and hum:FindFirstChildOfClass("Animator")
 	local root = model:FindFirstChild("HumanoidRootPart")
-	if not (hum and animator and root) then
-		return
+	if not (hum and root) then
+		return false
 	end
-	local state = { Model = model, Humanoid = hum, Root = root, Weights = { 1, 0, 0 } }
+	local animator = hum:FindFirstChildOfClass("Animator")
+	if not animator then
+		-- a local Animator animates it on this screen just the same
+		animator = Instance.new("Animator")
+		animator.Parent = hum
+	end
+	local tracks = loadSet(animator, CLIPS)
+	if not tracks then
+		return false
+	end
+	local state = { Model = model, Humanoid = hum, Root = root, Weights = { 1, 0, 0 }, Tracks = tracks }
 	rigs[model] = state
-	task.spawn(function()
-		-- prefer Rthro; use the classic clips if those never load
-		local tracks = loadSet(animator, SETS.Rthro)
-		local t0 = os.clock()
-		while tracks and not loaded(tracks) and os.clock() - t0 < 4 do
-			task.wait(0.2)
-		end
-		if not (tracks and loaded(tracks)) then
-			if tracks then
-				for _, t in pairs(tracks) do
-					t:Destroy()
-				end
-			end
-			tracks = loadSet(animator, SETS.Classic)
-		end
-		if rigs[model] == state then
-			state.Tracks = tracks
-		end
-	end)
+	print("[NpcLocomotion] animating " .. model.Name)
 	state.LeftShoulder = findJoint(model, "LeftShoulder")
 	state.RightShoulder = findJoint(model, "RightShoulder")
 	-- arms out a little for regular guys, a lot for the mass monsters
@@ -103,39 +82,50 @@ local function track(model)
 	model.Destroying:Connect(function()
 		rigs[model] = nil
 	end)
+	return true
 end
 
--- The server sets "Loco" right after spawning, and it can reach this client a
--- moment AFTER the model itself does, so wait for the flag instead of checking once.
-local watched = setmetatable({}, { __mode = "k" })
+-- Pick up every NPC: on spawn, and in a sweep every second (so a model
+-- whose parts or flag arrive late is never missed).
 local function consider(inst)
-	if not inst:IsA("Model") or watched[inst] then
-		return
-	end
-	if inst:GetAttribute("Loco") ~= nil then
-		watched[inst] = true
+	if inst:IsA("Model") and inst:GetAttribute("Loco") ~= nil and not rigs[inst] then
 		track(inst)
-		return
-	end
-	if inst:FindFirstChildOfClass("Humanoid") then
-		watched[inst] = true
-		local conn
-		conn = inst:GetAttributeChangedSignal("Loco"):Connect(function()
-			conn:Disconnect()
-			track(inst)
-		end)
 	end
 end
 
-for _, d in ipairs(workspace:GetDescendants()) do
-	consider(d)
+-- influencers live in workspace.Influencers, front-desk staff in each plot
+local function sweep()
+	local folder = workspace:FindFirstChild("Influencers")
+	if folder then
+		for _, m in ipairs(folder:GetChildren()) do
+			consider(m)
+		end
+	end
+	local map = workspace:FindFirstChild("GymWarsMap")
+	local plots = map and map:FindFirstChild("Plots")
+	if plots then
+		for _, plot in ipairs(plots:GetChildren()) do
+			for _, m in ipairs(plot:GetChildren()) do
+				if m:IsA("Model") then
+					consider(m)
+				end
+			end
+		end
+	end
 end
+
+sweep()
 workspace.DescendantAdded:Connect(function(d)
 	if d:IsA("Model") then
 		task.defer(consider, d)
 	elseif d:IsA("Humanoid") and d.Parent then
-		-- the humanoid can replicate after its model
 		task.defer(consider, d.Parent)
+	end
+end)
+task.spawn(function()
+	while true do
+		task.wait(1)
+		sweep()
 	end
 end)
 
