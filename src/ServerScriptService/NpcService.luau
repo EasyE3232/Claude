@@ -29,9 +29,7 @@ NpcService.GROUP_PLAYERS = "Players"
 
 -- Roblox default R15 animations (owned by Roblox, usable in any experience)
 local ANIMS = {
-	Idle = "rbxassetid://507766388",
-	Walk = "rbxassetid://507777826",
-	Run = "rbxassetid://507767714",
+	-- (idle / walk / run play on the clients: StarterPlayerScripts.NpcLocomotion)
 	Jump = "rbxassetid://507765000",
 	Fall = "rbxassetid://507767968",
 	Wave = "rbxassetid://507770239",
@@ -208,6 +206,8 @@ function NpcService.Activate(model)
 		end)
 	end
 	NpcService._ensureAnims(model)
+	-- walking/running/idle are animated on each client (StarterPlayerScripts.NpcLocomotion)
+	model:SetAttribute("Loco", true)
 end
 
 -- ----------------------------------------------------------------------
@@ -246,59 +246,6 @@ function NpcService._ensureAnims(model)
 	return set
 end
 
--- Locomotion blending (mirrors the default Animate script's walk/run blend)
-local function updateLocomotion(set, hrp, dt)
-	if not set.Enabled then
-		return
-	end
-	local v = hrp.AssemblyLinearVelocity
-	-- speed relative to what we're standing on (so riding the conveyor = idle)
-	local ground = set.Humanoid.FloorMaterial ~= Enum.Material.Air
-	local groundVel = Vector3.zero
-	if ground then
-		local ray = workspace:Raycast(hrp.Position, Vector3.new(0, -6, 0), set.RayParams)
-		if ray and ray.Instance then
-			groundVel = ray.Instance.AssemblyLinearVelocity
-		end
-	end
-	local flat = (v - groundVel) * Vector3.new(1, 0, 1)
-	local speed = flat.Magnitude
-	local tracks = set.Tracks
-	local idle, walk, run = tracks.Idle, tracks.Walk, tracks.Run
-	if not (idle and walk and run) then
-		return
-	end
-	for _, t in ipairs({ idle, walk, run }) do
-		if not t.IsPlaying then
-			t:Play(0.2, 0.001, 1)
-		end
-	end
-	local heightScale = math.max(set.Humanoid.HipHeight / 2, 0.5)
-	local rs = speed * 1.25 / 16 / heightScale
-	local wIdle, wWalk, wRun, warp = 0, 0, 0, 1
-	if speed < 0.6 then
-		wIdle = 1
-	elseif rs <= 0.5 then
-		wWalk, warp = 1, rs / 0.5
-	elseif rs < 1 then
-		local f = (rs - 0.5) / 0.5
-		wWalk, wRun = 1 - f, f
-	else
-		wRun, warp = 1, rs
-	end
-	set.Weights = set.Weights or { 1, 0, 0 }
-	local k = math.clamp(dt * 8, 0, 1)
-	set.Weights[1] += (wIdle - set.Weights[1]) * k
-	set.Weights[2] += (wWalk - set.Weights[2]) * k
-	set.Weights[3] += (wRun - set.Weights[3]) * k
-	idle:AdjustWeight(math.max(set.Weights[1], 0.001), 0.1)
-	walk:AdjustWeight(math.max(set.Weights[2], 0.001), 0.1)
-	run:AdjustWeight(math.max(set.Weights[3], 0.001), 0.1)
-	idle:AdjustSpeed(set.Humanoid.Parent and set.Humanoid.Parent:GetAttribute("IdleSpeed") or 1)
-	walk:AdjustSpeed(math.max(warp, 0.1))
-	run:AdjustSpeed(math.max(warp, 0.1))
-end
-
 function NpcService.PlayEmote(model, name)
 	local set = NpcService._ensureAnims(model)
 	local track = set and set.Tracks[name]
@@ -325,6 +272,7 @@ function NpcService.SetAnimationsEnabled(model, enabled)
 		return
 	end
 	set.Enabled = enabled
+	model:SetAttribute("Loco", enabled) -- clients stop walk/idle while the rig works out
 	if not enabled then
 		for _, t in pairs(set.Tracks) do
 			t:Stop(0.1)
@@ -585,18 +533,6 @@ function NpcService.GetLeaderRoot(model)
 end
 
 function NpcService._step(dt)
-	for model, set in pairs(animSets) do
-		local hrp = model.Parent and model:FindFirstChild("HumanoidRootPart")
-		if hrp and not hrp.Anchored then
-			if not set.RayParams then
-				set.RayParams = RaycastParams.new()
-				set.RayParams.FilterType = Enum.RaycastFilterType.Exclude
-				set.RayParams.FilterDescendantsInstances = { model }
-			end
-			updateLocomotion(set, hrp, dt)
-		end
-	end
-
 	for model, c in pairs(controllers) do
 		if not model.Parent or not c.Root or not c.Root.Parent then
 			controllers[model] = nil

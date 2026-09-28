@@ -23,6 +23,7 @@ FILES = [
     "src/StarterPlayerScripts/MeshCharacters.client.luau",
     "src/StarterPlayerScripts/PortalFx.client.luau",
     "src/StarterPlayerScripts/DropClocks.client.luau",
+    "src/StarterPlayerScripts/NpcLocomotion.client.luau",
 ]
 
 # builders shared with the map generator, installed as temporary modules
@@ -161,7 +162,7 @@ if not s then s=Instance.new(e[2]) s.Name=name s.Parent=parent end
 s.Source=e[3]
 installed+=1
 end
-print(("GYM WARS UPDATED: %d scripts, wall teleporters + drop clocks, gyms at %d studs from the carpet, %d stair ramps. Press Ctrl/Cmd+S, then Play."):format(installed,LOTX,ramps))
+print(("GYM WARS UPDATED: %d scripts, smoother NPC walking, wall teleporters + drop clocks, gyms at %d studs from the carpet, %d stair ramps. Press Ctrl/Cmd+S, then Play."):format(installed,LOTX,ramps))
 '''
 lines = [l.strip() for l in code.strip().splitlines() if l.strip()]
 body = " ".join(lines)
