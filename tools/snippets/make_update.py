@@ -11,6 +11,8 @@ FILES = [
     "src/ReplicatedStorage/Modules/Constants.luau",
     "src/ReplicatedStorage/Modules/MeshCharacter.luau",
     "src/ReplicatedStorage/Modules/Gym/Poses.luau",
+    "src/ReplicatedStorage/Modules/Gym/Exercises.luau",
+    "src/ReplicatedStorage/Modules/Gym/RigSolver.luau",
     "src/ServerScriptService/BeltService.luau",
     "src/ServerScriptService/CharacterLooks.luau",
     "src/ServerScriptService/CharacterModels.luau",

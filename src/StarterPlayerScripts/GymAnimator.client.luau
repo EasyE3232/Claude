@@ -394,6 +394,16 @@ RunService.PreSimulation:Connect(function(dt)
 	end
 end)
 
+-- live grip tuning: re-seat everyone so the new grip distance applies at once
+workspace.AttributeChanged:Connect(function(name)
+	if name:match("^GripOffset") then
+		for model, a in pairs(active) do
+			deactivate(a)
+			active[model] = nil
+		end
+	end
+end)
+
 if influencers then
 	influencers.ChildRemoved:Connect(function(model)
 		local a = active[model]

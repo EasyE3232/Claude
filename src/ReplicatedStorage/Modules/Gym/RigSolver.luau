@@ -124,6 +124,18 @@ function RigSolver:_measure()
 	d.SoleToAnkle = J.LeftAnkle.C1.Position + Vector3.new(0, foot.Size.Y / 2, 0)
 	d.HipLocal = { Left = J.LeftHip.C0.Position, Right = J.RightHip.C0.Position }
 	d.ShoulderLocal = { Left = J.LeftShoulder.C0.Position, Right = J.RightShoulder.C0.Position }
+	-- Wrist -> palm: some rigs (e.g. Meshy / Auto Setup) put the hand part almost
+	-- on the wrist, which would put bars and dumbbells at the wrist. Never go
+	-- below a share of the hand's size / forearm length, and allow a per-model
+	-- override ("GripOffset" attribute, or workspace "GripOffset_<CharacterId>").
+	local hand = self.Parts.LeftHand
+	local estimate = math.max(d.WristToGrip, hand and hand.Size.Y * 0.45 or 0, d.ArmLower * 0.2)
+	local model = self.Model
+	local override = model:GetAttribute("GripOffset")
+	if override == nil and workspace then
+		override = workspace:GetAttribute("GripOffset_" .. tostring(model:GetAttribute("CharacterId")))
+	end
+	d.WristToGrip = (type(override) == "number" and override > 0) and override or estimate
 	d.LegLength = d.LegUpper + d.LegLower
 	d.ArmReach = d.ArmUpper + d.ArmLower + d.WristToGrip
 	-- LowerTorso-center height above the floor when standing straight
@@ -269,6 +281,15 @@ function RigSolver:_twoBone(upperName, lowerName, endName, target, pole, hingeSi
 	end
 	self.Dirty = true
 	return elbow, tip
+end
+
+-- World frame of a hand's grip point (palm center), oriented like the hand.
+function RigSolver:grip(side)
+	local hand = self:world(side .. "Hand")
+	local wrist = self:pivot(side .. "Wrist")
+	local toHand = hand.Position - wrist
+	local dir = toHand.Magnitude > 0.15 and toHand.Unit or -hand.UpVector
+	return CFrame.new(wrist + dir * self.Dims.WristToGrip) * rotOnly(hand)
 end
 
 -- Put a hand's grip point (≈ palm center) on `grip`.

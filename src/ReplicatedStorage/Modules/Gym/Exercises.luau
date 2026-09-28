@@ -477,8 +477,8 @@ function Exercises.DumbbellCurl(rig, S, t, P)
 			sup = rad(5)
 		end
 		rig:set(side .. "Wrist", CFrame.Angles(0, -s * sup, 0) * CFrame.Angles(-rad(12) * c, 0, 0))
-		local hand = rig:world(side .. "Hand")
-		e.Moves["Dumbbell" .. (s < 0 and "L" or "R")] = hand * CFrame.new(0, -0.02, 0) * CFrame.Angles(0, pi / 2, 0)
+		local hand = rig:grip(side)
+		e.Moves["Dumbbell" .. (s < 0 and "L" or "R")] = hand * CFrame.Angles(0, pi / 2, 0)
 	end
 
 	standardLook(rig, S, t, P, Vector3.new(0, 5, -10))

@@ -683,6 +683,9 @@ function CharacterLooks._finish(model, char, rarity)
 	rarityFx(model, char, rarity)
 
 	model:SetAttribute("CharacterId", char.Name)
+	if char.GripOffset then
+		model:SetAttribute("GripOffset", char.GripOffset) -- studs, same as the live tuning value
+	end
 	model:SetAttribute("RarityId", char.Rarity)
 	model:SetAttribute("Rarity", rarity.Index)
 	if char.Poses then
