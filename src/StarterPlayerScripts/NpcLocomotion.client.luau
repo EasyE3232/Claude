@@ -105,9 +105,25 @@ local function track(model)
 	end)
 end
 
+-- The server sets "Loco" right after spawning, and it can reach this client a
+-- moment AFTER the model itself does, so wait for the flag instead of checking once.
+local watched = setmetatable({}, { __mode = "k" })
 local function consider(inst)
-	if inst:IsA("Model") and inst:GetAttribute("Loco") ~= nil then
+	if not inst:IsA("Model") or watched[inst] then
+		return
+	end
+	if inst:GetAttribute("Loco") ~= nil then
+		watched[inst] = true
 		track(inst)
+		return
+	end
+	if inst:FindFirstChildOfClass("Humanoid") then
+		watched[inst] = true
+		local conn
+		conn = inst:GetAttributeChangedSignal("Loco"):Connect(function()
+			conn:Disconnect()
+			track(inst)
+		end)
 	end
 end
 
@@ -117,11 +133,8 @@ end
 workspace.DescendantAdded:Connect(function(d)
 	if d:IsA("Model") then
 		task.defer(consider, d)
-	end
-end)
--- the flag can arrive after the model does
-workspace.DescendantAdded:Connect(function(d)
-	if d:IsA("Humanoid") and d.Parent then
+	elseif d:IsA("Humanoid") and d.Parent then
+		-- the humanoid can replicate after its model
 		task.defer(consider, d.Parent)
 	end
 end)

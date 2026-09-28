@@ -187,6 +187,8 @@ function NpcService.CreateRig(opts)
 		face.Parent = head
 	end
 
+	-- set before the model is parented so clients get it together with the model
+	model:SetAttribute("Loco", true)
 	NpcService.SetGroup(model, NpcService.GROUP_NPC)
 	for _, d in ipairs(model:GetDescendants()) do
 		if d:IsA("BasePart") then
